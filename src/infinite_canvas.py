@@ -1,8 +1,11 @@
 import sys
 from PyQt5.QtWidgets import QGraphicsView, QGraphicsScene, QApplication, QGraphicsPixmapItem
 from PyQt5.QtGui import QColor, QPainter, QPixmap, QDragEnterEvent, QDropEvent, QPen
-from PyQt5.QtCore import Qt, QMimeData
+from PyQt5.QtCore import Qt, QMimeData, QPointF
 from selectable_item import SelectableImageItem
+from PyQt5.QtWidgets import QAction
+import json
+from PyQt5.QtWidgets import QFileDialog
 
 class InfiniteCanvas(QGraphicsView):
     def __init__(self):
@@ -25,6 +28,8 @@ class InfiniteCanvas(QGraphicsView):
 
         self.is_middle_button_dragging = False
         self.last_drag_position = None
+        self.setShortcut()
+
 
     def mousePressEvent(self, event):
         if event.button() == Qt.RightButton:
@@ -101,12 +106,22 @@ class InfiniteCanvas(QGraphicsView):
         pixmap = QPixmap(image_path)
         if not pixmap.isNull():
             item = SelectableImageItem(pixmap)
-            
-            image_center_x = position.x() - pixmap.width() / 2
-            image_center_y = position.y() - pixmap.height() / 2
-
-            item.setPos(image_center_x, image_center_y)
+            item.setData(0, image_path)  
+            item.setPos(position)
+            item.setScale(1) 
+            item.setRotation(0)  
+            item.setTransformOriginPoint(pixmap.width() / 2, pixmap.height() / 2) 
             self.scene.addItem(item)
+            item.itemData.dataChanged.connect(lambda item=item: self.updateItemData(item))
+
+    def updateItemData(self, item):
+        data = {
+            "image_path": item.data(0),
+            "position": {"x": item.x(), "y": item.y()},
+            "rotation": item.rotation(),
+            "scale": item.scale() 
+        }
+        print("Updated item data:", data)
 
     def wheelEvent(self, event):
         zoomInFactor = 1.25 
@@ -119,3 +134,85 @@ class InfiniteCanvas(QGraphicsView):
         else:
             self.scale(zoomOutFactor, zoomOutFactor)
 
+    ##SAVE AND LOAD##
+    def setShortcut(self):
+        self.saveAction = QAction("Save", self)
+        self.saveAction.setShortcut("Ctrl+S")
+        self.saveAction.triggered.connect(self.saveToFile)
+        self.addAction(self.saveAction)
+
+        self.openAction = QAction("Open", self)
+        self.openAction.setShortcut("Ctrl+O")
+        self.openAction.triggered.connect(self.loadFromFile)
+        self.addAction(self.openAction)
+
+    def collectItemData(self):
+        items_data = []
+        for item in self.scene.items():
+            if isinstance(item, SelectableImageItem):
+                data = {
+                    "image_path": item.data(0),  
+                    "position": {"x": item.x(), "y": item.y()},
+                    "rotation": item.rotation(),
+                    "scale": item.scale() 
+                }
+                items_data.append(data)
+        return items_data
+
+    def saveToFile(self):
+        items_data = self.collectItemData()
+        file_path, _ = QFileDialog.getSaveFileName(self, "Save File", "", "BetterRef Files (*.brf)")
+        if file_path:
+            with open(file_path, 'w') as file:
+                json.dump(items_data, file, indent=4)
+            print(f"File saved: {file_path}") 
+
+    def loadFromFile(self, file_path):
+        with open(file_path, 'r') as file:
+            items_data = json.load(file)
+        for data in items_data:
+            self.addImageFromData(data)
+
+    def addImageFromData(self, data):
+        image_path = data["image_path"]
+        position = QPointF(data["position"]["x"], data["position"]["y"])
+        scale_x = data["scale"]["x"]
+        scale_y = data["scale"]["y"]
+        rotation = data["rotation"]
+        pixmap = QPixmap(image_path)
+        item = SelectableImageItem(pixmap)
+        item.setData(0, image_path)
+        item.setPos(position)
+        item.setScale(scale_x) 
+        item.setRotation(rotation)
+        self.scene.addItem(item)
+
+        ##LOAD SHIT
+
+
+    def loadFromFile(self):            
+            file_path, _ = QFileDialog.getOpenFileName(self, "Open File", "", "BetterRef Files (*.brf)")
+            if file_path:
+                with open(file_path, 'r') as file:
+                    items_data = json.load(file)
+                self.restoreScene(items_data)
+
+    def restoreScene(self, items_data):
+        self.scene.clear()  
+        for data in items_data:
+            self.addImageFromData(data)
+
+    def addImageFromData(self, data):
+        image_path = data["image_path"]
+        position = QPointF(data["position"]["x"], data["position"]["y"])
+        scale = data.get("scale", 1) 
+        rotation = data.get("rotation", 0) 
+        pixmap = QPixmap(image_path)
+        if not pixmap.isNull():
+            item = SelectableImageItem(pixmap)
+            item.setData(0, image_path) 
+            item.setPos(position)
+            item.setScale(scale)  
+            item.setRotation(rotation)
+            item.setTransformOriginPoint(pixmap.width() / 2, pixmap.height() / 2)
+            self.scene.addItem(item)
