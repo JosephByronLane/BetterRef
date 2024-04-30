@@ -7,34 +7,31 @@ from PyQt5.QtGui import QColor, QPen
 
 class HandleItem(QGraphicsEllipseItem):
     def __init__(self, parent=None):
-        super().__init__(-10, -10, 20, 20, parent)  
+        super().__init__(-10, -10, 20, 20, parent)
         self.setBrush(QColor('blue'))
         self.setFlag(QGraphicsItem.ItemIsMovable, True)
         self.setFlag(QGraphicsItem.ItemSendsGeometryChanges, True)
-        self.setZValue(100)  
-        self.parentItem = parent  
+        self.setZValue(100)
+        self.parentItem = parent
 
     def mousePressEvent(self, event):
-        self.startPos = self.scenePos()
+        self.startPos = self.mapToScene(event.pos())
         self.originPos = self.parentItem.pos()
-        self.originScale = self.parentItem.scale()
+        self.originSize = self.parentItem.pixmap().size()
+        self.startScale = self.parentItem.scale()
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
-        currentPos = self.scenePos()
-        delta = currentPos - self.startPos
+        currentPos = self.mapToScene(event.pos())
+        delta = (currentPos - self.startPos) * self.startScale  # Apply current scale to delta
 
-        if delta.manhattanLength() == 0:
-            return
+        # Calculate diagonal scaling factor
+        startDiag = (self.originSize.width() ** 2 + self.originSize.height() ** 2) ** 0.5
+        newDiag = startDiag + delta.manhattanLength()
+        scaleFactor = newDiag / startDiag
 
-        originalDiagonal = (self.originPos - self.parentItem.mapToScene(self.parentItem.boundingRect().bottomRight())).manhattanLength()
-        newDiagonal = (self.originPos - currentPos).manhattanLength()
-        scaleFactor = newDiagonal / originalDiagonal
-
-        self.parentItem.setScale(self.originScale * scaleFactor)
-
-        self.parentItem.itemData.dataChanged.emit()
-
+        self.parentItem.setScale(self.startScale * scaleFactor)
+        self.parentItem.itemData.dataChanged.emit()  # Emit signal to update any external data
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
