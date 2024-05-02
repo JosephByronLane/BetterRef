@@ -8,7 +8,6 @@ from PyQt5.QtCore import pyqtSignal, QObject
 class ItemData(QObject):
     dataChanged = pyqtSignal()
 
-
 class SelectableImageItem(QGraphicsPixmapItem):
     def __init__(self, pixmap):
         super().__init__(pixmap)
@@ -23,6 +22,21 @@ class SelectableImageItem(QGraphicsPixmapItem):
         if self.isSelected():
             painter.setPen(QPen(QColor('blue'), 3))  
             painter.drawRect(self.boundingRect())
+
+    def updateHandles(self):
+        if not self.isSelected():
+            for handle in self.handles:
+                handle.hide()
+            return
+
+        # Recalculate the handle positions after a scale or move operation
+        rect = self.boundingRect().adjusted(-10, -10, 10, 10)  # Adjust if your handle size is different
+        self.handles[0].setPos(self.mapToScene(rect.topLeft()))
+        self.handles[1].setPos(self.mapToScene(rect.topRight()))
+        self.handles[2].setPos(self.mapToScene(rect.bottomRight()))
+        self.handles[3].setPos(self.mapToScene(rect.bottomLeft()))
+        for handle in self.handles:
+            handle.show()
 
 
     def mousePressEvent(self, event: QMouseEvent):
@@ -51,17 +65,17 @@ class SelectableImageItem(QGraphicsPixmapItem):
             painter.drawRect(self.boundingRect())
 
     def updateHandles(self):
-        if self.isSelected() and not self.handles:
-            for _ in range(4):  
-                handle = HandleItem(self)
-                self.handles.append(handle)
-            self.positionHandles()
-        elif not self.isSelected():
+        if not self.isSelected():
             for handle in self.handles:
-                self.scene().removeItem(handle)
-            self.handles.clear()
-        else:
-            self.positionHandles() 
+                handle.hide()
+            return
+
+        # Ensure handles are shown and correctly positioned around the image
+        rect = self.boundingRect()
+        corners = [rect.topLeft(), rect.topRight(), rect.bottomRight(), rect.bottomLeft()]
+        for handle, pos in zip(self.handles, corners):
+            handle.setPos(self.mapToScene(pos))
+            handle.show()
 
     def positionHandles(self):
         rect = self.boundingRect()

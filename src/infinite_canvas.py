@@ -1,11 +1,13 @@
 import sys
 from PyQt5.QtWidgets import QGraphicsView, QGraphicsScene, QApplication, QGraphicsPixmapItem
 from PyQt5.QtGui import QColor, QPainter, QPixmap, QDragEnterEvent, QDropEvent, QPen
-from PyQt5.QtCore import Qt, QMimeData, QPointF
+from PyQt5.QtCore import Qt, QUrl, pyqtSignal, QObject
 from selectable_item import SelectableImageItem
 from PyQt5.QtWidgets import QAction
 import json
 from PyQt5.QtWidgets import QFileDialog
+from video_player import VideoGraphicsItem
+from PyQt5.QtMultimediaWidgets import QVideoWidget
 
 class InfiniteCanvas(QGraphicsView):
     def __init__(self):
@@ -92,15 +94,23 @@ class InfiniteCanvas(QGraphicsView):
             
     def dropEvent(self, event: QDropEvent):
         if event.mimeData().hasUrls():
-            urls = event.mimeData().urls()
-            if len(urls) > 0:
-                image_path = urls[0].toLocalFile()
+            url = event.mimeData().urls()[0]
+            file_path = url.toLocalFile()
 
-                view_position = event.pos()
+            if file_path.lower().endswith(('.mp4', '.avi', '.mov')):  # Check for common video file extensions
+                pos = event.pos()
+                self.addVideoToScene(file_path, pos)
+            else:
+                self.addImageToScene(file_path, event.pos())  # Existing method for images
 
-                scene_position = self.mapToScene(view_position)
-
-                self.addImageToScene(image_path, scene_position)
+    def addVideoToScene(self, file_path, position):
+        videoItem = VideoGraphicsItem(file_path)
+        # Adjust position so the video appears centered on the cursor
+        videoRect = videoItem.boundingRect()
+        adjustedPos = QPointF(position.x() - videoRect.width() / 2, position.y() - videoRect.height() / 2)
+        videoItem.setPos(adjustedPos)
+        self.scene.addItem(videoItem)
+        videoItem.itemData.dataChanged.connect(self.updateItemData)
 
     def addImageToScene(self, image_path, position):
         pixmap = QPixmap(image_path)
