@@ -11,6 +11,7 @@ from PyQt5.QtMultimediaWidgets import QVideoWidget
 from PyQt5.QtWidgets import QGraphicsTextItem, QGraphicsItem
 from PyQt5.QtWidgets import QGraphicsProxyWidget, QLineEdit, QGraphicsSceneMouseEvent, QGraphicsRectItem, QGraphicsTextItem
 from PyQt5.QtGui import QCursor
+from editableText import EditableTextItem
 
 
 
@@ -83,7 +84,7 @@ class InfiniteCanvas(QGraphicsView):
             super().mouseReleaseEvent(event)
 
     def keyPressEvent(self, event):
-        if event.key() == Qt.Key_T:
+        if event.key() == Qt.Key_T and not any(isinstance(item, EditableTextItem) and item.textInteractionFlags() & Qt.TextEditorInteraction for item in self.scene.items()):
             self.addTextItem()   
         if event.key() == Qt.Key_Q and event.modifiers() == Qt.ControlModifier:
             self.close()
@@ -92,7 +93,7 @@ class InfiniteCanvas(QGraphicsView):
     
     def addTextItem(self):
         mouse_pos = self.mapToScene(self.mapFromGlobal(QCursor.pos()))  # Convert global mouse position to scene coordinates
-        text_item = QGraphicsTextItem("Text")
+        text_item = EditableTextItem("Text")
         text_item.setDefaultTextColor(Qt.white)  # Set text color
         text_item.setFlags(QGraphicsItem.ItemIsMovable | QGraphicsItem.ItemIsSelectable)  # Make text item movable and selectable
         text_item.setPos(mouse_pos)  # Set position at the mouse position in the scene
@@ -100,6 +101,7 @@ class InfiniteCanvas(QGraphicsView):
         text_item.setTextInteractionFlags(Qt.TextEditorInteraction)
         text_item.setFocus()
         text_item.setTextInteractionFlags(Qt.NoTextInteraction)
+        
 
 
     def closeEvent(self, event):
