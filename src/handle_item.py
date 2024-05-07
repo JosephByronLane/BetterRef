@@ -35,39 +35,26 @@ class HandleItem(QGraphicsEllipseItem):
         self.originalSize = self.parentItem().boundingRect().size()
 
     def mouseMoveEvent(self, event):
-        QGraphicsEllipseItem.mouseMoveEvent(self, event)  # Call the base class method
-
-        # Calculate the current mouse position in the scene coordinates
+        QGraphicsEllipseItem.mouseMoveEvent(self, event)  
         currentPos = self.mapToScene(event.pos())
-        # Calculate the delta from the starting position to the current position
         delta = currentPos - self.startPos
 
-        # Calculate vectors from the center of the parent item
         center = self.parentItem().sceneBoundingRect().center()
         startVector = self.startPos - center
         currentVector = currentPos - center
 
-        # Calculate scaling factor based on the length of vectors
         if startVector.manhattanLength() != 0:
             scaleFactor = currentVector.manhattanLength() / startVector.manhattanLength()
         else:
             scaleFactor = .5
 
-        # Correcting scale sensitivity by adjusting the scale factor calculation
-        scaleFactor = 1 + (scaleFactor - 1) / 2  # Adjust this factor to tune sensitivity
+        scaleFactor = 1 + (scaleFactor - 1) / 2
 
-        # Set the scale with the center as the anchor point
         self.parentItem().setTransformOriginPoint(self.parentItem().boundingRect().width() / 2, self.parentItem().boundingRect().height() / 2)
         self.parentItem().setScale(self.startScale * scaleFactor)
 
-        # Emit the dataChanged signal to update any bindings or save changes
         self.parentItem().itemData.dataChanged.emit()
+        super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
-        self.parentItem().updateHandles() 
         super().mouseReleaseEvent(event)
-
-    def mouseReleaseEvent(self, event):
-        QGraphicsEllipseItem.mouseReleaseEvent(self, event)  # Call the base class method
-        # Update handle positions to reflect the new size
-        self.parentItem().updateHandles()

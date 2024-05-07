@@ -24,19 +24,17 @@ class SelectableImageItem(QGraphicsPixmapItem):
             painter.drawRect(self.boundingRect())
 
     def updateHandles(self):
-        if not self.isSelected():
+        if self.isSelected() and not self.handles:
+            for _ in range(4):  
+                handle = HandleItem(self)
+                self.handles.append(handle)
+            self.positionHandles()
+        elif not self.isSelected():
             for handle in self.handles:
-                handle.hide()
-            return
-
-        # Recalculate the handle positions after a scale or move operation
-        rect = self.boundingRect().adjusted(-10, -10, 10, 10)  # Adjust if your handle size is different
-        self.handles[0].setPos(self.mapToScene(rect.topLeft()))
-        self.handles[1].setPos(self.mapToScene(rect.topRight()))
-        self.handles[2].setPos(self.mapToScene(rect.bottomRight()))
-        self.handles[3].setPos(self.mapToScene(rect.bottomLeft()))
-        for handle in self.handles:
-            handle.show()
+                self.scene().removeItem(handle)
+            self.handles.clear()
+        else:
+            self.positionHandles() 
 
 
     def mousePressEvent(self, event: QMouseEvent):

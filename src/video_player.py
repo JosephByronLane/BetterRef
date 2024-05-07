@@ -1,11 +1,10 @@
 from PyQt5.QtMultimedia import QMediaPlayer
 from PyQt5.QtMultimediaWidgets import QVideoWidget
-from PyQt5.QtCore import Qt, QUrl, pyqtSignal, QObject
+from PyQt5.QtCore import QUrl
 from PyQt5.QtWidgets import QGraphicsView, QGraphicsScene, QApplication, QGraphicsPixmapItem, QGraphicsItem, QMenu
 from PyQt5.QtMultimediaWidgets import QVideoWidget, QGraphicsVideoItem
 from PyQt5.QtMultimedia import QMediaContent
 from PyQt5.QtCore import pyqtSignal, QObject
-from PyQt5.QtWidgets import QPushButton, QSlider, QVBoxLayout, QWidget
 
 
 class ItemData(QObject):
@@ -17,26 +16,13 @@ class VideoGraphicsItem(QGraphicsVideoItem):
         self.setFlag(QGraphicsItem.ItemIsSelectable, True)
         self.setFlag(QGraphicsItem.ItemIsMovable, True)
 
-        # Initialize media player
         self.mediaPlayer = QMediaPlayer(None, QMediaPlayer.VideoSurface)
         self.mediaPlayer.setVideoOutput(self)
         self.mediaPlayer.setMedia(QMediaContent(QUrl.fromLocalFile(url)))
-        self.mediaPlayer.play()  # Start playing immediately; adjust as needed
+        self.mediaPlayer.play()  
 
-        # Metadata and signaling for changes
         self.itemData = ItemData()
-        self.url = url  # Store video URL for saving/loading state
-
-        # Layout for controls
-        self.layout = QVBoxLayout()
-        self.playPauseButton = QPushButton("Pause")
-        self.playPauseButton.clicked.connect(self.togglePlay)
-        self.timeline = QSlider(Qt.Horizontal)
-        self.timeline.setMaximum(1000)  # Assuming 1000 steps
-        self.timeline.sliderMoved.connect(self.setVideoPosition)
-        self.layout.addWidget(self.playPauseButton)
-        self.layout.addWidget(self.timeline)
-        self.setLayout(self.layout)
+        self.url = url  
 
     def contextMenuEvent(self, event):
         menu = QMenu()
@@ -55,10 +41,8 @@ class VideoGraphicsItem(QGraphicsVideoItem):
     def togglePlay(self):
         if self.mediaPlayer.state() == QMediaPlayer.PlayingState:
             self.mediaPlayer.pause()
-            self.playPauseButton.setText("Play")
         else:
             self.mediaPlayer.play()
-            self.playPauseButton.setText("Pause")
 
     def setPosition(self, position):
         self.mediaPlayer.setPosition(position)
@@ -89,29 +73,3 @@ class VideoGraphicsItem(QGraphicsVideoItem):
                 items_data.append(data)
             # Include similar handling for images if mixed content
         return items_data
-    
-
-    def setVideoPosition(self, position):
-        # Calculate the position in the video to seek to
-        videoLength = self.mediaPlayer.duration()
-        seekPosition = videoLength * (position / 1000)
-        self.mediaPlayer.setPosition(seekPosition)
-
-    def updateSlider(self):
-        currentPosition = self.mediaPlayer.position()
-        totalDuration = self.mediaPlayer.duration()
-        if totalDuration > 0:
-            sliderValue = 1000 * currentPosition / totalDuration
-            self.timeline.setValue(int(sliderValue))
-
-    def updateHandles(self):
-        if not self.isSelected():
-            for handle in self.handles:
-                handle.hide()
-        else:
-            # Ensure handles are shown and correctly positioned around the video
-            rect = self.boundingRect()
-            corners = [rect.topLeft(), rect.topRight(), rect.bottomRight(), rect.bottomLeft()]
-            for handle, pos in zip(self.handles, corners):
-                handle.setPos(self.mapToScene(pos))
-                handle.show()
