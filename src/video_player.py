@@ -123,12 +123,16 @@ class VideoGraphicsItem(QGraphicsVideoItem):
             # Include similar handling for images if mixed content
         return items_data    
 
+    def boundingRect(self):
+        originalRect = super().boundingRect()
+        outlineWidth = 3  # Same as the outline pen width
+        return originalRect.adjusted(-outlineWidth, -outlineWidth, outlineWidth, outlineWidth)
+
     def paint(self, painter, option, widget=None):
         super().paint(painter, option, widget)
         if self.isSelected():
             painter.setPen(QPen(QColor('blue'), 3))
-            painter.drawRect(self.boundingRect())
-
+            painter.drawRect(self.boundingRect().adjusted(3, 3, -3, -3))
     def itemChange(self, change, value):
         if change == QGraphicsItem.ItemSelectedHasChanged:
             if value:
@@ -182,8 +186,9 @@ class VideoGraphicsItem(QGraphicsVideoItem):
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event: QMouseEvent):
+        if self.isSelected():
+            self.scene().update()
         if self.dragging:
-            #simplemente hereda la implementacion default de QMouseEvent, de momento no hay que cambiarle.
             super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event: QMouseEvent):

@@ -131,6 +131,8 @@ class InfiniteCanvas(QGraphicsView):
     def addVideoToScene(self, file_path, position):
         print("adding video")
         videoItem = VideoGraphicsItem(file_path)
+        videoItem.setData(0, file_path)  
+
         videoItem.setPos(position)
         videoItem.setScale(6.0)  # Adjust this value based on your needs
 
