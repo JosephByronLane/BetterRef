@@ -2,12 +2,12 @@ import sys
 from PyQt5.QtWidgets import QGraphicsView, QGraphicsScene, QApplication, QGraphicsPixmapItem
 from PyQt5.QtGui import QColor, QPainter, QPixmap, QDragEnterEvent, QDropEvent, QPen
 from PyQt5.QtCore import Qt, QMimeData, QPointF
+from selectable_item import SelectableImageItem
 from PyQt5.QtWidgets import QAction
 import json
 from PyQt5.QtWidgets import QFileDialog
 from video_player import VideoGraphicsItem
 from PyQt5.QtMultimediaWidgets import QVideoWidget
-from selectable_item import SelectablePixmapItem, SelectableVideoItem, SelectableItem
 
 class InfiniteCanvas(QGraphicsView):
     def __init__(self):
@@ -42,15 +42,17 @@ class InfiniteCanvas(QGraphicsView):
             self.setCursor(Qt.ClosedHandCursor)
         else:
             item = self.itemAt(event.pos())
-            if item and isinstance(item, SelectableImageItem):
-                if self.selectedItem:
+            if item:
+                if self.selectedItem and self.selectedItem != item:
                     self.selectedItem.setSelected(False)
                 item.setSelected(True)
                 self.selectedItem = item
+                self.scene.update()  # Force the scene to update and redraw items
             else:
                 if self.selectedItem:
                     self.selectedItem.setSelected(False)
                     self.selectedItem = None
+                self.scene.update()  # Update the scene if no item is clicked
             super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
@@ -94,34 +96,35 @@ class InfiniteCanvas(QGraphicsView):
             
     def dropEvent(self, event: QDropEvent):
         if event.mimeData().hasUrls():
-            urls = event.mimeData().urls()
-            if len(urls) > 0:
-                file_path = urls[0].toLocalFile()
-                view_position = event.pos()
-                scene_position = self.mapToScene(view_position)
-                if file_path.lower().endswith(('.mp4', '.avi', '.mov')): 
-                    self.addVideoToScene(file_path, scene_position)
-                else:
-                    self.addImageToScene(file_path, scene_position)  
+            url = event.mimeData().urls()[0]
+            file_path = url.toLocalFile()
 
+            if file_path.lower().endswith(('.mp4', '.avi', '.mov')):  # Check for common video file extensions
+                self.addVideoToScene(file_path, event.pos())
+            else:
+                self.addImageToScene(file_path, event.pos())  # Existing method for images
+                
     def addVideoToScene(self, file_path, position):
-        videoItem = SelectableVideoItem(file_path)
-        videoRect = videoItem.boundingRect()
-        adjustedPos = position - QPointF(videoRect.width() / 2, videoRect.height() / 2)
-        videoItem.setPos(adjustedPos)
+        print("adding video")
+        videoItem = VideoGraphicsItem(file_path)
+        videoItem.setPos(position)
+        videoItem.setScale(6.0)  # Adjust this value based on your needs
+
         self.scene.addItem(videoItem)
-        videoItem.itemData.dataChanged.connect(self.updateItemData)
+        videoItem.itemData.dataChanged.connect(lambda item=videoItem: self.updateItemData(item))
+        print("video added")
 
     def addImageToScene(self, image_path, position):
         pixmap = QPixmap(image_path)
         if not pixmap.isNull():
-            item = SelectablePixmapItem(pixmap)
-            # Ensure boundingRect is calculated immediately after setting pixmap
-            itemRect = item.boundingRect()  
-            adjustedPos = position - QPointF(itemRect.width() / 2, itemRect.height() / 2)
-            item.setPos(adjustedPos)
+            item = SelectableImageItem(pixmap)
+            item.setData(0, image_path)  
+            item.setPos(position)
+            item.setScale(1) 
+            item.setRotation(0)  
+            item.setTransformOriginPoint(pixmap.width() / 2, pixmap.height() / 2) 
             self.scene.addItem(item)
-            item.itemData.dataChanged.connect(self.updateItemData)
+            item.itemData.dataChanged.connect(lambda item=item: self.updateItemData(item))
 
     def updateItemData(self, item):
         data = {

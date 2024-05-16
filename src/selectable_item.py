@@ -1,93 +1,96 @@
-from PyQt5.QtWidgets import QGraphicsItem
-from PyQt5.QtGui import QPen, QColor, QPainter
-from PyQt5.QtCore import pyqtSignal, QObject, QRectF
+from PyQt5.QtWidgets import QGraphicsPixmapItem, QGraphicsItem
+from PyQt5.QtGui import QPen, QColor
+from PyQt5.QtCore import QPointF, Qt
+from PyQt5.QtGui import QMouseEvent
 from handle_item import HandleItem
-from PyQt5.QtWidgets import QGraphicsView, QGraphicsScene, QApplication, QGraphicsPixmapItem
-from PyQt5.QtMultimediaWidgets import QGraphicsVideoItem
-from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
-from PyQt5.QtCore import QUrl
-
+from PyQt5.QtCore import pyqtSignal, QObject
 
 class ItemData(QObject):
     dataChanged = pyqtSignal()
 
-class SelectableItem(QGraphicsItem):
-    def __init__(self, parent=None):
-        super().__init__(parent)
+class SelectableImageItem(QGraphicsPixmapItem):
+    def __init__(self, pixmap):
+        super().__init__(pixmap)
         self.setFlags(QGraphicsItem.ItemIsSelectable | QGraphicsItem.ItemIsMovable)
-        self.handles = [HandleItem(self) for _ in range(4)]
-        self.itemData = ItemData()
-        self.hideHandles()
-
-    def hideHandles(self):
+        self.handles = [HandleItem(self) for _ in range(4)]  
         for handle in self.handles:
             handle.hide()
+        self.itemData = ItemData()
 
-    def showHandles(self):
-        for handle in self.handles:
-            handle.show()
+    def paint(self, painter, option, widget=None):
+        super().paint(painter, option, widget)
+        if self.isSelected():
+            painter.setPen(QPen(QColor('blue'), 3))  
+            painter.drawRect(self.boundingRect())
 
     def updateHandles(self):
         if not self.isSelected():
-            self.hideHandles()
+            for handle in self.handles:
+                handle.hide()
             return
 
-        rect = self.boundingRect().adjusted(-10, -10, 10, 10)  # adjust for handle size
-        positions = [rect.topLeft(), rect.topRight(), rect.bottomRight(), rect.bottomLeft()]
-        for handle, pos in zip(self.handles, positions):
-            handle.setPos(pos)
+        # Recalculate the handle positions after a scale or move operation
+        rect = self.boundingRect().adjusted(-10, -10, 10, 10)  # Adjust if your handle size is different
+        self.handles[0].setPos(self.mapToScene(rect.topLeft()))
+        self.handles[1].setPos(self.mapToScene(rect.topRight()))
+        self.handles[2].setPos(self.mapToScene(rect.bottomRight()))
+        self.handles[3].setPos(self.mapToScene(rect.bottomLeft()))
+        for handle in self.handles:
             handle.show()
 
-    def mousePressEvent(self, event):
-        super().mousePressEvent(event)
-        if self.isSelected():
-            self.updateHandles()
 
-    def mouseReleaseEvent(self, event):
-        super().mouseReleaseEvent(event)
-        if self.isSelected():
+    def mousePressEvent(self, event: QMouseEvent):
+        if event.button() == Qt.LeftButton:
+            self.dragging = True
+            self.setCursor(Qt.ClosedHandCursor)
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event: QMouseEvent):
+        if self.dragging:
+            #simplemente hereda la implementacion default de QMouseEvent, de momento no hay que cambiarle.
+            super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event: QMouseEvent):
+        if event.button() == Qt.LeftButton and self.dragging:
+            self.dragging = False
+            self.setCursor(Qt.ArrowCursor)
             self.itemData.dataChanged.emit()
 
+        super().mouseReleaseEvent(event)
+
     def paint(self, painter, option, widget=None):
+        super().paint(painter, option, widget)
         if self.isSelected():
-            pen = QPen(QColor('blue'), 3)
-            painter.setPen(pen)
+            painter.setPen(QPen(QColor('blue'), 3))
             painter.drawRect(self.boundingRect())
 
-    def boundingRect(self):
-        # Must be implemented in the subclass to return the item's bounding rect
-        return QRectF()
+    def updateHandles(self):
+        if not self.isSelected():
+            for handle in self.handles:
+                handle.hide()
+            return
+
+        # Ensure handles are shown and correctly positioned around the image
+        rect = self.boundingRect()
+        corners = [rect.topLeft(), rect.topRight(), rect.bottomRight(), rect.bottomLeft()]
+        for handle, pos in zip(self.handles, corners):
+            handle.setPos(self.mapToScene(pos))
+            handle.show()
+
+    def positionHandles(self):
+        rect = self.boundingRect()
+        self.handles[0].setPos(rect.topLeft())
+        self.handles[1].setPos(rect.topRight())
+        self.handles[2].setPos(rect.bottomRight())
+        self.handles[3].setPos(rect.bottomLeft())
 
     def itemChange(self, change, value):
-        if change == QGraphicsItem.ItemSelectedChange:
-            if value:
-                self.showHandles()
-            else:
-                self.hideHandles()
-        return super().itemChange(change, value)
-
-
-
-class SelectableVideoItem(SelectableItem, QGraphicsVideoItem):
-    def __init__(self, url, parent=None):
-        QGraphicsVideoItem.__init__(self, parent)
-        SelectableItem.__init__(self, parent)
-        self.mediaPlayer = QMediaPlayer(None, QMediaPlayer.VideoSurface)
-        self.mediaPlayer.setVideoOutput(self)
-        self.mediaPlayer.setMedia(QMediaContent(QUrl.fromLocalFile(url)))
-        self.mediaPlayer.play()  # Start playing immediately; adjust as needed
-        self.url = url
-
-    def boundingRect(self):
-        return self.nativeSize()  # Returns the video frame size
-
-class SelectablePixmapItem(SelectableItem, QGraphicsPixmapItem):
-    def __init__(self, pixmap=None, parent=None):
-        QGraphicsPixmapItem.__init__(self, parent)  # Initialize parent class
-        SelectableItem.__init__(self, parent)       # Initialize SelectableItem
-        if pixmap:
-            self.setPixmap(pixmap)  # Set the pixmap after the base class initialization
-    def boundingRect(self):
-        if self.pixmap():
-            return QRectF(self.pixmap().rect())
-        return QRectF()
+            if change == QGraphicsItem.ItemSelectedHasChanged:
+                if value:  
+                    self.positionHandles()  
+                    for handle in self.handles:
+                        handle.show()  
+                else:  
+                    for handle in self.handles:
+                        handle.hide() 
+            return super().itemChange(change, value)
