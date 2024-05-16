@@ -1,17 +1,26 @@
 import sys
 from PyQt5.QtWidgets import QGraphicsView, QGraphicsScene, QApplication, QGraphicsPixmapItem
 from PyQt5.QtGui import QColor, QPainter, QPixmap, QDragEnterEvent, QDropEvent, QPen
-from PyQt5.QtCore import Qt, QMimeData, QPointF
+from PyQt5.QtCore import Qt, QUrl, pyqtSignal, QObject, QRectF, QPointF, QEvent
 from selectable_item import SelectableImageItem
 from PyQt5.QtWidgets import QAction
 import json
 from PyQt5.QtWidgets import QFileDialog
 from video_player import VideoGraphicsItem
 from PyQt5.QtMultimediaWidgets import QVideoWidget
+from PyQt5.QtWidgets import QGraphicsTextItem, QGraphicsItem
+from PyQt5.QtWidgets import QGraphicsProxyWidget, QLineEdit, QGraphicsSceneMouseEvent, QGraphicsRectItem, QGraphicsTextItem
+from PyQt5.QtGui import QCursor
+from editableText import EditableTextItem
+
+
 
 class InfiniteCanvas(QGraphicsView):
     def __init__(self):
         super().__init__()
+
+        self.text_edit = None
+        self.text_input_placeholder = None
 
         self.scene = QGraphicsScene(self)
         self.setScene(self.scene)
@@ -77,10 +86,25 @@ class InfiniteCanvas(QGraphicsView):
             super().mouseReleaseEvent(event)
 
     def keyPressEvent(self, event):
+        if event.key() == Qt.Key_T and not any(isinstance(item, EditableTextItem) and item.textInteractionFlags() & Qt.TextEditorInteraction for item in self.scene.items()):
+            self.addTextItem()   
         if event.key() == Qt.Key_Q and event.modifiers() == Qt.ControlModifier:
             self.close()
         else:
             super().keyPressEvent(event)
+    
+    def addTextItem(self):
+        mouse_pos = self.mapToScene(self.mapFromGlobal(QCursor.pos()))  # Convert global mouse position to scene coordinates
+        text_item = EditableTextItem("Text")
+        text_item.setDefaultTextColor(Qt.white)  # Set text color
+        text_item.setFlags(QGraphicsItem.ItemIsMovable | QGraphicsItem.ItemIsSelectable)  # Make text item movable and selectable
+        text_item.setPos(mouse_pos)  # Set position at the mouse position in the scene
+        self.scene.addItem(text_item)
+        text_item.setTextInteractionFlags(Qt.TextEditorInteraction)
+        text_item.setFocus()
+        text_item.setTextInteractionFlags(Qt.NoTextInteraction)
+        
+
 
     def closeEvent(self, event):
         event.accept()
@@ -157,6 +181,9 @@ class InfiniteCanvas(QGraphicsView):
         self.openAction.setShortcut("Ctrl+O")
         self.openAction.triggered.connect(self.loadFromFile)
         self.addAction(self.openAction)
+
+
+
 
     def collectItemData(self):
         items_data = []
