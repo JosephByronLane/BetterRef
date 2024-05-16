@@ -230,7 +230,6 @@ class InfiniteCanvas(QGraphicsView):
 
         ##LOAD SHIT
 
-
     def loadFromFile(self):            
             file_path, _ = QFileDialog.getOpenFileName(self, "Open File", "", "BetterRef Files (*.brf)")
             if file_path:
