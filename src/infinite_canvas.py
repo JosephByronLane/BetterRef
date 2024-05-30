@@ -231,12 +231,12 @@ class InfiniteCanvas(QGraphicsView):
         ##LOAD SHIT
 
 
-    def loadFromFile(self):            
-            file_path, _ = QFileDialog.getOpenFileName(self, "Open File", "", "BetterRef Files (*.brf)")
-            if file_path:
-                with open(file_path, 'r') as file:
-                    items_data = json.load(file)
-                self.restoreScene(items_data)
+    def loadFromFile(self, file_path):            
+        file_path, _ = QFileDialog.getOpenFileName(self, "Open File", "", "BetterRef Files (*.brf)")
+        if file_path:
+            with open(file_path, 'r') as file:
+                items_data = json.load(file)
+            self.restoreScene(items_data)
 
     def restoreScene(self, items_data):
         self.scene.clear()  
