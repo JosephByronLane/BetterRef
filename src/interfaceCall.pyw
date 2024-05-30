@@ -17,7 +17,7 @@ class newwindow(QMainWindow):
         self.pushButton.clicked.connect(self.onPushButtonClicked)
         self.pushButton_2.clicked.connect(self.onPushButton2Clicked)
 
-        self.canvas = InfiniteCanvas()
+        self.canvas = None
         
         
     def onPushButtonClicked(self):
@@ -26,9 +26,8 @@ class newwindow(QMainWindow):
         print("Botón 1 clicado")
 
     def onPushButton2Clicked(self):
-        file_path, _ = QFileDialog.getOpenFileName(self, "Open File", "", "BetterRef Files (*.brf)")
-        if file_path:
-            self.canvas.loadFromFile(file_path)
+        script_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'main2.py')
+        subprocess.Popen(['python', script_path])
         print("Botón 2 clicado")
     
 
