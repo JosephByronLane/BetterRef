@@ -208,40 +208,24 @@ class InfiniteCanvas(QGraphicsView):
                 json.dump(items_data, file, indent=4)
             print(f"File saved: {file_path}") 
 
-    def loadFromFile(self, file_path):
-        with open(file_path, 'r') as file:
-            items_data = json.load(file)
-        for data in items_data:
-            self.addImageFromData(data)
-
-    def addImageFromData(self, data):
-        image_path = data["image_path"]
-        position = QPointF(data["position"]["x"], data["position"]["y"])
-        scale_x = data["scale"]["x"]
-        scale_y = data["scale"]["y"]
-        rotation = data["rotation"]
-        pixmap = QPixmap(image_path)
-        item = SelectableImageItem(pixmap)
-        item.setData(0, image_path)
-        item.setPos(position)
-        item.setScale(scale_x) 
-        item.setRotation(rotation)
-        self.scene.addItem(item)
-
-        ##LOAD SHIT
-
 
     def loadFromFile(self):            
-            file_path, _ = QFileDialog.getOpenFileName(self, "Open File", "", "BetterRef Files (*.brf)")
-            if file_path:
+        file_path, _ = QFileDialog.getOpenFileName(self, "Open File", "", "BetterRef Files (*.brf)")
+        if file_path:
+            try:
                 with open(file_path, 'r') as file:
                     items_data = json.load(file)
                 self.restoreScene(items_data)
+                print(f"Scene loaded successfully from {file_path} L")
+            except Exception as e:
+                print(f"Error loading file: {e}")
 
     def restoreScene(self, items_data):
         self.scene.clear()  
         for data in items_data:
             self.addImageFromData(data)
+        self.scene.update()  # Force the scene to update and redraw items
+        print(f"Scene restored with {len(items_data)} items")
 
     def addImageFromData(self, data):
         image_path = data["image_path"]
