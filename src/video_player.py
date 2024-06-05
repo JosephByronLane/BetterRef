@@ -10,7 +10,6 @@ from PyQt5.QtGui import QPainter, QPen, QColor
 from handle_item import HandleItem
 from PyQt5.QtGui import QMouseEvent
 
-
 class ItemData(QObject):
     dataChanged = pyqtSignal()
 
@@ -21,8 +20,8 @@ class VideoGraphicsItem(QGraphicsVideoItem):
         self.setFlag(QGraphicsItem.ItemIsMovable, True)
         self.url = url
 
-        self.handles = [HandleItem(self) for _ in range(4)]  # Create four handles
-        self.hideHandles()  # Initially hide the handles
+        self.handles = [HandleItem(self) for _ in range(4)]  
+        self.hideHandles() 
 
         self.initUI(url)
 
@@ -33,29 +32,25 @@ class VideoGraphicsItem(QGraphicsVideoItem):
         self.mediaPlayer.setVideoOutput(self)
         self.mediaPlayer.setMedia(QMediaContent(QUrl.fromLocalFile(url)))
 
-        # Widget for controls
         controlWidget = QWidget()
         layout = QHBoxLayout()
-        self.playPauseButton = QPushButton("Pause")  # Start with "Pause" since video plays immediately
+        self.playPauseButton = QPushButton("Pause") 
         self.playPauseButton.clicked.connect(self.togglePlayPause)
         layout.addWidget(self.playPauseButton)
 
-        # Progress bar
         self.progressBar = QSlider(Qt.Horizontal)
         self.progressBar.setRange(0, 100)
         layout.addWidget(self.progressBar)
         controlWidget.setLayout(layout)
 
-        # Adding the controls to the scene using a proxy widget
         self.controlsProxy = QGraphicsProxyWidget(self)
         self.controlsProxy.setWidget(controlWidget)
-        self.controlsProxy.setPos(0, self.boundingRect().height())  # Position at the bottom of the video
+        self.controlsProxy.setPos(0, self.boundingRect().height())  
 
-        # Connect signals to update the progress bar
         self.mediaPlayer.positionChanged.connect(self.updateProgressBar)
         self.mediaPlayer.durationChanged.connect(self.updateProgressBar)
         
-        self.mediaPlayer.play()  # Start playing immediately; adjust as needed
+        self.mediaPlayer.play() 
 
         self.updateControlWidgetSize()
 

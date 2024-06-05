@@ -9,10 +9,10 @@ from PyQt5.QtWidgets import QFileDialog
 from video_player import VideoGraphicsItem
 from PyQt5.QtMultimediaWidgets import QVideoWidget
 from PyQt5.QtWidgets import QGraphicsTextItem, QGraphicsItem
-from PyQt5.QtWidgets import QGraphicsProxyWidget, QLineEdit, QGraphicsSceneMouseEvent, QGraphicsRectItem, QGraphicsTextItem
+from PyQt5.QtWidgets import QAction, QLineEdit, QGraphicsSceneMouseEvent, QGraphicsRectItem, QGraphicsItemGroup
 from PyQt5.QtGui import QCursor
 from editableText import EditableTextItem
-
+from handle_item import HandleItem
 
 
 class InfiniteCanvas(QGraphicsView):
@@ -36,10 +36,69 @@ class InfiniteCanvas(QGraphicsView):
         self.setRenderHint(QPainter.Antialiasing, False)
         self.setWindowTitle("BetterRef")
         self.selectedItem = None
-
+        self.group = None 
+        self.groupBoundingBox = None
         self.is_middle_button_dragging = False
         self.last_drag_position = None
         self.setShortcut()
+
+    def selectAllItems(self):
+        for item in self.scene.items():
+            item.setSelected(True)
+        self.groupSelectedItems()
+
+    def groupSelectedItems(self):
+        if self.group:
+            self.scene.removeItem(self.group) 
+            self.scene.removeItem(self.groupBoundingBox)  
+
+        self.group = QGraphicsItemGroup()
+        for item in self.scene.selectedItems():
+            item.setSelected(False)  
+            self.group.addToGroup(item)
+
+        self.scene.addItem(self.group)
+        self.group.setFlags(QGraphicsItem.ItemIsMovable | QGraphicsItem.ItemIsSelectable | QGraphicsItem.ItemIsFocusable)
+        self.group.setFiltersChildEvents(False)  
+
+        self.groupBoundingBox = QGraphicsRectItem(self.group.boundingRect())
+        self.groupBoundingBox.setPen(QPen(QColor('blue'), 3))
+        self.groupBoundingBox.setBrush(QColor(0, 0, 0, 0))  
+        self.groupBoundingBox.setParentItem(self.group)
+        self.groupBoundingBox.setZValue(self.group.zValue() - 1)  
+
+        self.groupBoundingBox.handles = [HandleItem(self.groupBoundingBox) for _ in range(4)]
+        self.updateGroupHandles()
+        
+
+    def hideGroupHandles(self):
+        if self.groupBoundingBox:
+            for handle in self.groupBoundingBox.handles:
+                handle.hide()
+            self.groupBoundingBox.hide()
+
+    def updateGroupHandles(self):
+        if not self.groupBoundingBox:
+            return
+
+        rect = self.groupBoundingBox.rect()
+        corners = [rect.topLeft(), rect.topRight(), rect.bottomRight(), rect.bottomLeft()]
+        for handle, pos in zip(self.groupBoundingBox.handles, corners):
+            handle.setPos(pos)
+            handle.show()
+
+    def deselectGroup(self):
+        if self.groupBoundingBox:
+            for handle in self.groupBoundingBox.handles:
+                handle.hide()
+            self.groupBoundingBox.hide()
+        if self.group:
+            items = self.group.childItems()
+            for item in items:
+                self.group.removeFromGroup(item)
+                self.scene.addItem(item)
+            self.scene.removeItem(self.group)
+            self.group = None
 
 
     def mousePressEvent(self, event):
@@ -56,12 +115,14 @@ class InfiniteCanvas(QGraphicsView):
                     self.selectedItem.setSelected(False)
                 item.setSelected(True)
                 self.selectedItem = item
-                self.scene.update()  # Force the scene to update and redraw items
+                self.scene.update()
             else:
                 if self.selectedItem:
                     self.selectedItem.setSelected(False)
                     self.selectedItem = None
-                self.scene.update()  # Update the scene if no item is clicked
+                if self.group:
+                    self.deselectGroup()
+                self.scene.update()
             super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
@@ -94,16 +155,20 @@ class InfiniteCanvas(QGraphicsView):
             super().keyPressEvent(event)
     
     def addTextItem(self):
-        mouse_pos = self.mapToScene(self.mapFromGlobal(QCursor.pos()))  # Convert global mouse position to scene coordinates
+        mouse_pos = self.mapToScene(self.mapFromGlobal(QCursor.pos()))  
         text_item = EditableTextItem("Text")
-        text_item.setDefaultTextColor(Qt.white)  # Set text color
-        text_item.setFlags(QGraphicsItem.ItemIsMovable | QGraphicsItem.ItemIsSelectable)  # Make text item movable and selectable
-        text_item.setPos(mouse_pos)  # Set position at the mouse position in the scene
+        text_item.setDefaultTextColor(Qt.white) 
+
+        font = text_item.font()
+        font.setPointSize(24)  
+        text_item.setFont(font)
+
+        text_item.setFlags(QGraphicsItem.ItemIsMovable | QGraphicsItem.ItemIsSelectable) 
+        text_item.setPos(mouse_pos)
         self.scene.addItem(text_item)
         text_item.setTextInteractionFlags(Qt.TextEditorInteraction)
         text_item.setFocus()
-        text_item.setTextInteractionFlags(Qt.NoTextInteraction)
-        
+        text_item.setTextInteractionFlags(Qt.NoTextInteraction)       
 
 
     def closeEvent(self, event):
@@ -123,10 +188,10 @@ class InfiniteCanvas(QGraphicsView):
             url = event.mimeData().urls()[0]
             file_path = url.toLocalFile()
 
-            if file_path.lower().endswith(('.mp4', '.avi', '.mov')):  # Check for common video file extensions
+            if file_path.lower().endswith(('.mp4', '.avi', '.mov')):  
                 self.addVideoToScene(file_path, event.pos())
             else:
-                self.addImageToScene(file_path, event.pos())  # Existing method for images
+                self.addImageToScene(file_path, event.pos()) 
                 
     def addVideoToScene(self, file_path, position):
         print("adding video")
@@ -134,7 +199,7 @@ class InfiniteCanvas(QGraphicsView):
         videoItem.setData(0, file_path)  
 
         videoItem.setPos(position)
-        videoItem.setScale(6.0)  # Adjust this value based on your needs
+        videoItem.setScale(6.0)  
 
         self.scene.addItem(videoItem)
         videoItem.itemData.dataChanged.connect(lambda item=videoItem: self.updateItemData(item))
@@ -184,8 +249,10 @@ class InfiniteCanvas(QGraphicsView):
         self.openAction.triggered.connect(self.loadFromFile)
         self.addAction(self.openAction)
 
-
-
+        selectAllAction = QAction("Select All", self)
+        selectAllAction.setShortcut("Ctrl+A")
+        selectAllAction.triggered.connect(self.selectAllItems)
+        self.addAction(selectAllAction)
 
     def collectItemData(self):
         items_data = []
@@ -206,7 +273,7 @@ class InfiniteCanvas(QGraphicsView):
                     "position": {"x": item.x(), "y": item.y()},
                     "rotation": item.rotation(),
                     "scale": item.scale(),
-                    "media_position": item.mediaPlayer.position()  # Save current playback position
+                    "media_position": item.mediaPlayer.position() 
                 }
                 items_data.append(data)
             elif isinstance(item, EditableTextItem):
@@ -216,7 +283,7 @@ class InfiniteCanvas(QGraphicsView):
                     "position": {"x": item.x(), "y": item.y()},
                     "scale": item.scale(),
                     "font": item.font().toString(),
-                    "color": item.defaultTextColor().name()  # Save text color
+                    "color": item.defaultTextColor().name() 
 
                 }
                 items_data.append(data)
@@ -264,7 +331,7 @@ class InfiniteCanvas(QGraphicsView):
         videoItem.setPos(position)
         videoItem.setScale(scale)
         videoItem.setRotation(rotation)
-        videoItem.mediaPlayer.setPosition(media_position)  # Restore playback position
+        videoItem.mediaPlayer.setPosition(media_position) 
         self.scene.addItem(videoItem)
 
     def addImageFromData(self, data):
@@ -287,7 +354,7 @@ class InfiniteCanvas(QGraphicsView):
         position = QPointF(data["position"]["x"], data["position"]["y"])
         scale = data.get("scale", 1)
         font_str = data.get("font", "")
-        color_str = data.get("color", "#FFFFFF")  # Default to white if no color is specified
+        color_str = data.get("color", "#FFFFFF") 
 
         text_item = EditableTextItem(text)
         text_item.setPos(position)
@@ -296,6 +363,6 @@ class InfiniteCanvas(QGraphicsView):
             font = QFont()
             font.fromString(font_str)
             text_item.setFont(font)
-        text_item.setDefaultTextColor(QColor(color_str))  # Set the text color
+        text_item.setDefaultTextColor(QColor(color_str)) 
 
         self.scene.addItem(text_item)
