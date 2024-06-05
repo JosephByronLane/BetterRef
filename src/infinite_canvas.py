@@ -1,6 +1,6 @@
 import sys
 from PyQt5.QtWidgets import QGraphicsView, QGraphicsScene, QApplication, QGraphicsPixmapItem
-from PyQt5.QtGui import QColor, QPainter, QPixmap, QDragEnterEvent, QDropEvent, QPen
+from PyQt5.QtGui import QColor, QPainter, QPixmap, QDragEnterEvent, QDropEvent, QPen, QFont
 from PyQt5.QtCore import Qt, QUrl, pyqtSignal, QObject, QRectF, QPointF, QEvent
 from selectable_item import SelectableImageItem
 from PyQt5.QtWidgets import QAction
@@ -192,10 +192,32 @@ class InfiniteCanvas(QGraphicsView):
         for item in self.scene.items():
             if isinstance(item, SelectableImageItem):
                 data = {
-                    "image_path": item.data(0),  
+                    "type": "image",
+                    "image_path": item.data(0),
                     "position": {"x": item.x(), "y": item.y()},
                     "rotation": item.rotation(),
-                    "scale": item.scale() 
+                    "scale": item.scale()
+                }
+                items_data.append(data)
+            elif isinstance(item, VideoGraphicsItem):
+                data = {
+                    "type": "video",
+                    "file_path": item.url,
+                    "position": {"x": item.x(), "y": item.y()},
+                    "rotation": item.rotation(),
+                    "scale": item.scale(),
+                    "media_position": item.mediaPlayer.position()  # Save current playback position
+                }
+                items_data.append(data)
+            elif isinstance(item, EditableTextItem):
+                data = {
+                    "type": "text",
+                    "text": item.toPlainText(),
+                    "position": {"x": item.x(), "y": item.y()},
+                    "scale": item.scale(),
+                    "font": item.font().toString(),
+                    "color": item.defaultTextColor().name()  # Save text color
+
                 }
                 items_data.append(data)
         return items_data
@@ -208,23 +230,42 @@ class InfiniteCanvas(QGraphicsView):
                 json.dump(items_data, file, indent=4)
             print(f"File saved: {file_path}") 
 
-    def loadFromFile(self):            
+    def loadFromFile(self):
         file_path, _ = QFileDialog.getOpenFileName(self, "Open File", "", "BetterRef Files (*.brf)")
         if file_path:
             try:
                 with open(file_path, 'r') as file:
                     items_data = json.load(file)
                 self.restoreScene(items_data)
-                print(f"Scene loaded successfully from {file_path} L")
+                print(f"Scene loaded successfully from {file_path}")
             except Exception as e:
                 print(f"Error loading file: {e}")
 
     def restoreScene(self, items_data):
-        self.scene.clear()  
+        self.scene.clear()
         for data in items_data:
-            self.addImageFromData(data)
-        self.scene.update()  # Force the scene to update and redraw items
+            if data["type"] == "image":
+                self.addImageFromData(data)
+            elif data["type"] == "video":
+                self.addVideoFromData(data)
+            elif data["type"] == "text":
+                self.addTextFromData(data)
+        self.scene.update()
         print(f"Scene restored with {len(items_data)} items")
+
+    def addVideoFromData(self, data):
+        file_path = data["file_path"]
+        position = QPointF(data["position"]["x"], data["position"]["y"])
+        scale = data.get("scale", 1)
+        rotation = data.get("rotation", 0)
+        media_position = data.get("media_position", 0)
+
+        videoItem = VideoGraphicsItem(file_path)
+        videoItem.setPos(position)
+        videoItem.setScale(scale)
+        videoItem.setRotation(rotation)
+        videoItem.mediaPlayer.setPosition(media_position)  # Restore playback position
+        self.scene.addItem(videoItem)
 
     def addImageFromData(self, data):
         image_path = data["image_path"]
@@ -240,3 +281,21 @@ class InfiniteCanvas(QGraphicsView):
             item.setRotation(rotation)
             item.setTransformOriginPoint(pixmap.width() / 2, pixmap.height() / 2)
             self.scene.addItem(item)
+
+    def addTextFromData(self, data):
+        text = data["text"]
+        position = QPointF(data["position"]["x"], data["position"]["y"])
+        scale = data.get("scale", 1)
+        font_str = data.get("font", "")
+        color_str = data.get("color", "#FFFFFF")  # Default to white if no color is specified
+
+        text_item = EditableTextItem(text)
+        text_item.setPos(position)
+        text_item.setScale(scale)
+        if font_str:
+            font = QFont()
+            font.fromString(font_str)
+            text_item.setFont(font)
+        text_item.setDefaultTextColor(QColor(color_str))  # Set the text color
+
+        self.scene.addItem(text_item)

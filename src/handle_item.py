@@ -35,32 +35,30 @@ class HandleItem(QGraphicsEllipseItem):
         self.originalSize = self.parentItem().boundingRect().size()
 
     def mouseMoveEvent(self, event):
-        QGraphicsEllipseItem.mouseMoveEvent(self, event)  # Call the base class method
+        QGraphicsEllipseItem.mouseMoveEvent(self, event)  
 
-        # Calculate the current mouse position in the scene coordinates
         currentPos = self.mapToScene(event.pos())
-        # Calculate the delta from the starting position to the current position
         delta = currentPos - self.startPos
 
-        # Calculate vectors from the center of the parent item
+        # Calculate the center of the image
         center = self.parentItem().sceneBoundingRect().center()
-        startVector = self.startPos - center
-        currentVector = currentPos - center
 
-        # Calculate scaling factor based on the length of vectors
-        if startVector.manhattanLength() != 0:
-            scaleFactor = currentVector.manhattanLength() / startVector.manhattanLength()
+        # Calculate the distance from the center to the start position and current position
+        startDistance = (self.startPos - center).manhattanLength()
+        currentDistance = (currentPos - center).manhattanLength()
+
+        # Calculate the scale factor based on the change in distance
+        if startDistance != 0:
+            scaleFactor = currentDistance / startDistance
         else:
-            scaleFactor = .5
+            scaleFactor = 1
 
-        # Correcting scale sensitivity by adjusting the scale factor calculation
-        scaleFactor = 1 + (scaleFactor - 1) / 2  # Adjust this factor to tune sensitivity
+        # Set the transform origin point to the center of the image
+        self.parentItem().setTransformOriginPoint(center)
 
-        # Set the scale with the center as the anchor point
-        self.parentItem().setTransformOriginPoint(self.parentItem().boundingRect().width() / 2, self.parentItem().boundingRect().height() / 2)
+        # Scale the image by the calculated scale factor
         self.parentItem().setScale(self.startScale * scaleFactor)
 
-        # Emit the dataChanged signal to update any bindings or save changes
         self.parentItem().itemData.dataChanged.emit()
 
     def mouseReleaseEvent(self, event):
