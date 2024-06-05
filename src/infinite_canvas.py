@@ -9,10 +9,12 @@ from PyQt5.QtWidgets import QFileDialog
 from video_player import VideoGraphicsItem
 from PyQt5.QtMultimediaWidgets import QVideoWidget
 from PyQt5.QtWidgets import QGraphicsTextItem, QGraphicsItem
-from PyQt5.QtWidgets import QAction, QLineEdit, QGraphicsSceneMouseEvent, QGraphicsRectItem, QGraphicsItemGroup
+from PyQt5.QtWidgets import QAction, QLineEdit, QGraphicsSceneMouseEvent, QGraphicsRectItem, QGraphicsItemGroup, QMessageBox
 from PyQt5.QtGui import QCursor
 from editableText import EditableTextItem
 from handle_item import HandleItem
+from PyQt5.QtWidgets import QGraphicsView, QGraphicsScene, QMenu, QAction
+from settings_window import SettingsWindow
 
 
 class InfiniteCanvas(QGraphicsView):
@@ -21,6 +23,7 @@ class InfiniteCanvas(QGraphicsView):
 
         self.text_edit = None
         self.text_input_placeholder = None
+        self.settingsWindow = None
 
         self.scene = QGraphicsScene(self)
         self.setScene(self.scene)
@@ -190,8 +193,10 @@ class InfiniteCanvas(QGraphicsView):
 
             if file_path.lower().endswith(('.mp4', '.avi', '.mov')):  
                 self.addVideoToScene(file_path, event.pos())
-            else:
+            if file_path.lower().endswith(('.png', '.jpg', '.webp')):  
                 self.addImageToScene(file_path, event.pos()) 
+            else:
+                QMessageBox.critical(self, "Error", "Unsupported file format. Please drop a supported file (mp4, avi, mov, png, jpg, webp).")
                 
     def addVideoToScene(self, file_path, position):
         print("adding video")
@@ -366,3 +371,25 @@ class InfiniteCanvas(QGraphicsView):
         text_item.setDefaultTextColor(QColor(color_str)) 
 
         self.scene.addItem(text_item)
+
+    ##CONTXT MNU
+
+    def contextMenuEvent(self, event):
+        # Create a context menu
+        menu = QMenu(self)
+
+        # Create a "Settings" action
+        settingsAction = QAction("Settings", self)
+        settingsAction.triggered.connect(self.openSettings)
+
+        # Add the action to the menu
+        menu.addAction(settingsAction)
+
+        # Show the context menu at the position of the right-click event
+        menu.exec_(event.globalPos())
+
+    def openSettings(self):
+        print("Opening settings...")
+        if self.settingsWindow is None:
+            self.settingsWindow = SettingsWindow(self)
+        self.settingsWindow.show()

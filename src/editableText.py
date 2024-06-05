@@ -59,13 +59,12 @@ class EditableTextItem(QGraphicsTextItem):
             return
 
         rect = self.boundingRect()
-        print(f"Bounding Rect: {rect}")
         corners = [rect.topLeft(), rect.topRight(), rect.bottomRight(), rect.bottomLeft()]
-        print(f"corners: {corners}")
-
         for handle, pos in zip(self.handles, corners):
-            print(f"Handle tobe- pos: {pos}")
-            handle.setPos(self.mapToScene(pos))
+            # Calculate the scene position of the bounding box corners
+            scene_pos = self.mapToScene(pos)
+            print(f"Handle to-be pos: {pos}, Scene pos: {scene_pos}")
+            handle.setPos(scene_pos)
             print(f"Handle Position: {handle.pos()}")
             handle.show()
 
