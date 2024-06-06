@@ -193,7 +193,7 @@ class InfiniteCanvas(QGraphicsView):
 
             if file_path.lower().endswith(('.mp4', '.avi', '.mov')):  
                 self.addVideoToScene(file_path, event.pos())
-            if file_path.lower().endswith(('.png', '.jpg', '.webp')):  
+            elif file_path.lower().endswith(('.png', '.jpg', '.webp')):  
                 self.addImageToScene(file_path, event.pos()) 
             else:
                 QMessageBox.critical(self, "Error", "Unsupported file format. Please drop a supported file (mp4, avi, mov, png, jpg, webp).")
