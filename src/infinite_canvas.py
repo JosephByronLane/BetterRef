@@ -1,5 +1,5 @@
 import sys
-from PyQt5.QtWidgets import QGraphicsView, QGraphicsScene, QApplication, QGraphicsPixmapItem
+from PyQt5.QtWidgets import QGraphicsView, QGraphicsScene, QApplication, QGraphicsPixmapItem, QWidget 
 from PyQt5.QtGui import QColor, QPainter, QPixmap, QDragEnterEvent, QDropEvent, QPen, QFont, QContextMenuEvent
 from PyQt5.QtCore import Qt, QUrl, pyqtSignal, QObject, QRectF, QPointF, QEvent, QTimer, QPoint  
 from selectable_item import SelectableImageItem
@@ -15,7 +15,7 @@ from editableText import EditableTextItem
 from handle_item import HandleItem
 from PyQt5.QtWidgets import QGraphicsView, QGraphicsScene, QMenu, QAction
 from settings_window import SettingsWindow
-from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget
+from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout 
 from image_display import ImageDisplayWidget
 
 class InfiniteCanvas(QGraphicsView):
@@ -63,9 +63,27 @@ class InfiniteCanvas(QGraphicsView):
         # Create an instance of the ImageDisplayWidget, passing the canvas instance (self)
         self.image_display_widget = ImageDisplayWidget(canvas_instance=self)
 
-        # Wrap the widget in a QGraphicsProxyWidget to add it to the QGraphicsScene
+        # Create a container widget to hold the ImageDisplayWidget
+        container_widget = QWidget()
+        container_layout = QVBoxLayout(container_widget)
+        container_layout.addWidget(self.image_display_widget)
+        container_layout.setContentsMargins(10, 10, 10, 10)  # Set top, right, bottom, left margins
+
+        # Set an object name for the container widget
+        container_widget.setObjectName("imageDisplayContainer")
+
+        # Apply a dotted border style specifically to this container using the object name
+        container_widget.setStyleSheet("""
+            QWidget#imageDisplayContainer {
+                background: transparent;
+                border: 2px dotted #5F5F5F;  /* Dotted border with blue color */
+                border-radius:10px;
+            }
+        """)
+
+        # Wrap the container widget in a QGraphicsProxyWidget
         proxy_widget = QGraphicsProxyWidget()
-        proxy_widget.setWidget(self.image_display_widget)
+        proxy_widget.setWidget(container_widget)
 
         # Add the proxy widget to the scene
         self.scene.addItem(proxy_widget)
@@ -74,8 +92,8 @@ class InfiniteCanvas(QGraphicsView):
         scene_width = self.scene.width()
         scene_height = self.scene.height()
 
-        widget_width = self.image_display_widget.width()
-        widget_height = self.image_display_widget.height()
+        widget_width = container_widget.width()
+        widget_height = container_widget.height()
 
         # Calculate the center position
         center_x = (scene_width - widget_width) / 2

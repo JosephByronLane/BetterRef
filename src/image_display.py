@@ -10,8 +10,11 @@ class ImageDisplayWidget(QWidget):
 
         # Set the widget's background to be transparent
         self.setAttribute(Qt.WA_TranslucentBackground)
-        self.setStyleSheet("background: transparent;")
-
+        self.setStyleSheet("""
+            QWidget {
+                background: transparent;
+            }
+        """)
         # Store reference to the InfiniteCanvas instance
         self.canvas_instance = canvas_instance
 
@@ -27,11 +30,11 @@ class ImageDisplayWidget(QWidget):
         # Middle Element: Instruction Text Label
         self.instruction_label = QLabel("Try dragging in an image to get started!", self)
         self.instruction_label.setAlignment(Qt.AlignCenter)
-        self.instruction_label.setStyleSheet("color: #5F5F5F; font-size: 16px;")
+        self.instruction_label.setStyleSheet("color: #5F5F5F; font-size: 20px;")
 
         self.instruction_label_or = QLabel("or", self)
         self.instruction_label_or.setAlignment(Qt.AlignCenter)
-        self.instruction_label_or.setStyleSheet("color: #5F5F5F; font-size: 18px;")
+        self.instruction_label_or.setStyleSheet("color: #5F5F5F; font-size: 20px;")
 
         # Bottom Element: "Open File" Button with rounded corners, blue background, and white text
         self.open_file_button = QPushButton("Open a file", self)
@@ -41,7 +44,7 @@ class ImageDisplayWidget(QWidget):
                 color: white;  /* White text */
                 border-radius: 10px;  /* Rounded corners */
                 padding: 10px 20px;  /* Add padding */
-                font-size: 28px;
+                font-size: 20px;
             }
             QPushButton:hover {
                 background-color: #0056b3;  /* Darker blue when hovered */
