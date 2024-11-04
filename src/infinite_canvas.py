@@ -1,7 +1,7 @@
 import sys
 from PyQt5.QtWidgets import QGraphicsView, QGraphicsScene, QApplication, QGraphicsPixmapItem
-from PyQt5.QtGui import QColor, QPainter, QPixmap, QDragEnterEvent, QDropEvent, QPen, QFont
-from PyQt5.QtCore import Qt, QUrl, pyqtSignal, QObject, QRectF, QPointF, QEvent
+from PyQt5.QtGui import QColor, QPainter, QPixmap, QDragEnterEvent, QDropEvent, QPen, QFont, QContextMenuEvent
+from PyQt5.QtCore import Qt, QUrl, pyqtSignal, QObject, QRectF, QPointF, QEvent, QTimer, QPoint  
 from selectable_item import SelectableImageItem
 from PyQt5.QtWidgets import QAction
 import json
@@ -45,6 +45,20 @@ class InfiniteCanvas(QGraphicsView):
         self.last_drag_position = None
         self.setShortcut()
 
+
+        #context menu right click
+        self.drag_position = None
+        self.context_menu_timer = QTimer(self)
+        self.context_menu_timer.setSingleShot(True)
+        self.context_menu_timer.timeout.connect(self.show_context_menu)
+        self.context_menu_event = None
+        self.right_button_pressed = False
+        self.context_menu_position = None
+
+
+
+
+
     def selectAllItems(self):
         for item in self.scene.items():
             item.setSelected(True)
@@ -69,7 +83,7 @@ class InfiniteCanvas(QGraphicsView):
         self.groupBoundingBox.setBrush(QColor(0, 0, 0, 0))  
         self.groupBoundingBox.setParentItem(self.group)
         self.groupBoundingBox.setZValue(self.group.zValue() - 1)  
-
+        
         self.groupBoundingBox.handles = [HandleItem(self.groupBoundingBox) for _ in range(4)]
         self.updateGroupHandles()
         
@@ -107,10 +121,18 @@ class InfiniteCanvas(QGraphicsView):
     def mousePressEvent(self, event):
         if event.button() == Qt.RightButton:
             self.drag_position = event.globalPos()
+
+            self.right_button_pressed = True
+            self.context_menu_position = event.globalPos()  # Store the global position of the right-click
+
+            self.context_menu_event = event
+            self.context_menu_timer.start(1100)  # Start the timer for 200 ms
+
         if event.button() == Qt.MiddleButton or (event.button() == Qt.LeftButton and event.modifiers() == Qt.AltModifier):
             self.is_middle_button_dragging = True
             self.last_drag_position = event.pos()
             self.setCursor(Qt.ClosedHandCursor)
+
         else:
             item = self.itemAt(event.pos())
             if item:
@@ -130,22 +152,39 @@ class InfiniteCanvas(QGraphicsView):
 
     def mouseMoveEvent(self, event):
         if event.buttons() == Qt.RightButton:
+
+            # Cancel the context menu timer if dragging
+            if self.context_menu_timer.isActive():
+                self.context_menu_timer.stop()
+
             delta = event.globalPos() - self.drag_position
             self.move(self.x() + delta.x(), self.y() + delta.y())
             self.drag_position = event.globalPos()
+            self.right_button_pressed = False  # Set to False, indicating this is a drag, not a click
+
+
         if self.is_middle_button_dragging:
             delta = event.pos() - self.last_drag_position
             self.last_drag_position = event.pos()
 
             self.horizontalScrollBar().setValue(self.horizontalScrollBar().value() - delta.x())
             self.verticalScrollBar().setValue(self.verticalScrollBar().value() - delta.y())
+
         else:
             super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
+        if event.button() == Qt.RightButton:
+            # On releasing the right button, if no drag happened and the timer is not active, show the context menu
+            if self.right_button_pressed and not self.context_menu_timer.isActive():
+                self.show_context_menu()
+
+            self.right_button_pressed = False  # Reset the flag
+
         if event.button() == Qt.MiddleButton or (event.button() == Qt.LeftButton and event.modifiers() == Qt.AltModifier):
             self.is_middle_button_dragging = False
             self.setCursor(Qt.ArrowCursor)
+
         else:
             super().mouseReleaseEvent(event)
 
@@ -374,19 +413,22 @@ class InfiniteCanvas(QGraphicsView):
 
     ##CONTXT MNU
 
+    def show_context_menu(self):
+        if self.context_menu_position:
+            menu = QMenu(self)
+            print("open settings menu")
+            settingsAction = QAction("Settings", self)
+            settingsAction.triggered.connect(self.openSettings)
+
+            menu.addAction(settingsAction)
+
+            # Show the context menu at the stored position of the right-click event
+            menu.exec_(self.context_menu_position)
+
+
     def contextMenuEvent(self, event):
-        # Create a context menu
-        menu = QMenu(self)
-
-        # Create a "Settings" action
-        settingsAction = QAction("Settings", self)
-        settingsAction.triggered.connect(self.openSettings)
-
-        # Add the action to the menu
-        menu.addAction(settingsAction)
-
-        # Show the context menu at the position of the right-click event
-        menu.exec_(event.globalPos())
+        # Do nothing here, as we're now handling the context menu manually
+        pass
 
     def openSettings(self):
         print("Opening settings...")
