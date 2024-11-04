@@ -8,14 +8,15 @@ import json
 from PyQt5.QtWidgets import QFileDialog
 from video_player import VideoGraphicsItem
 from PyQt5.QtMultimediaWidgets import QVideoWidget
-from PyQt5.QtWidgets import QGraphicsTextItem, QGraphicsItem
+from PyQt5.QtWidgets import QGraphicsTextItem, QGraphicsItem, QGraphicsProxyWidget
 from PyQt5.QtWidgets import QAction, QLineEdit, QGraphicsSceneMouseEvent, QGraphicsRectItem, QGraphicsItemGroup, QMessageBox
 from PyQt5.QtGui import QCursor
 from editableText import EditableTextItem
 from handle_item import HandleItem
 from PyQt5.QtWidgets import QGraphicsView, QGraphicsScene, QMenu, QAction
 from settings_window import SettingsWindow
-
+from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget
+from image_display import ImageDisplayWidget
 
 class InfiniteCanvas(QGraphicsView):
     def __init__(self):
@@ -46,7 +47,7 @@ class InfiniteCanvas(QGraphicsView):
         self.setShortcut()
 
 
-        #context menu right click
+        #context menu
         self.drag_position = None
         self.context_menu_timer = QTimer(self)
         self.context_menu_timer.setSingleShot(True)
@@ -55,7 +56,33 @@ class InfiniteCanvas(QGraphicsView):
         self.right_button_pressed = False
         self.context_menu_position = None
 
+        # Add the ImageDisplayWidget to the scene
+        self.addImageDisplayWidget()
 
+    def addImageDisplayWidget(self):
+        # Create an instance of the ImageDisplayWidget, passing the canvas instance (self)
+        self.image_display_widget = ImageDisplayWidget(canvas_instance=self)
+
+        # Wrap the widget in a QGraphicsProxyWidget to add it to the QGraphicsScene
+        proxy_widget = QGraphicsProxyWidget()
+        proxy_widget.setWidget(self.image_display_widget)
+
+        # Add the proxy widget to the scene
+        self.scene.addItem(proxy_widget)
+
+        # Calculate the center position based on the scene size and widget size
+        scene_width = self.scene.width()
+        scene_height = self.scene.height()
+
+        widget_width = self.image_display_widget.width()
+        widget_height = self.image_display_widget.height()
+
+        # Calculate the center position
+        center_x = (scene_width - widget_width) / 2
+        center_y = (scene_height - widget_height) / 2
+
+        # Set the position to the calculated center
+        proxy_widget.setPos(center_x, center_y)
 
 
 
