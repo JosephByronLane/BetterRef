@@ -17,6 +17,9 @@ from PyQt5.QtWidgets import QGraphicsView, QGraphicsScene, QMenu, QAction
 from settings_window import SettingsWindow
 from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout 
 from image_display import ImageDisplayWidget
+from context_menu import CustomContextMenu
+from context_menu_entry import ContextMenuEntry
+
 
 class InfiniteCanvas(QGraphicsView):
     def __init__(self):
@@ -56,23 +59,20 @@ class InfiniteCanvas(QGraphicsView):
         self.right_button_pressed = False
         self.context_menu_position = None
 
-        # Add the ImageDisplayWidget to the scene
+        self.custom_context_menu = CustomContextMenu(self)
+
         self.addImageDisplayWidget()
 
     def addImageDisplayWidget(self):
-        # Create an instance of the ImageDisplayWidget, passing the canvas instance (self)
         self.image_display_widget = ImageDisplayWidget(canvas_instance=self)
 
-        # Create a container widget to hold the ImageDisplayWidget
         container_widget = QWidget()
         container_layout = QVBoxLayout(container_widget)
         container_layout.addWidget(self.image_display_widget)
-        container_layout.setContentsMargins(10, 10, 10, 10)  # Set top, right, bottom, left margins
+        container_layout.setContentsMargins(10, 10, 10, 10)  
 
-        # Set an object name for the container widget
         container_widget.setObjectName("imageDisplayContainer")
 
-        # Apply a dotted border style specifically to this container using the object name
         container_widget.setStyleSheet("""
             QWidget#imageDisplayContainer {
                 background: transparent;
@@ -81,25 +81,20 @@ class InfiniteCanvas(QGraphicsView):
             }
         """)
 
-        # Wrap the container widget in a QGraphicsProxyWidget
         proxy_widget = QGraphicsProxyWidget()
         proxy_widget.setWidget(container_widget)
 
-        # Add the proxy widget to the scene
         self.scene.addItem(proxy_widget)
 
-        # Calculate the center position based on the scene size and widget size
         scene_width = self.scene.width()
         scene_height = self.scene.height()
 
         widget_width = container_widget.width()
         widget_height = container_widget.height()
 
-        # Calculate the center position
         center_x = (scene_width - widget_width) / 2
         center_y = (scene_height - widget_height) / 2
 
-        # Set the position to the calculated center
         proxy_widget.setPos(center_x, center_y)
 
 
@@ -168,10 +163,10 @@ class InfiniteCanvas(QGraphicsView):
             self.drag_position = event.globalPos()
 
             self.right_button_pressed = True
-            self.context_menu_position = event.globalPos()  # Store the global position of the right-click
+            self.context_menu_position = event.globalPos()  
 
             self.context_menu_event = event
-            self.context_menu_timer.start(1100)  # Start the timer for 200 ms
+            self.context_menu_timer.start(200)  
 
         if event.button() == Qt.MiddleButton or (event.button() == Qt.LeftButton and event.modifiers() == Qt.AltModifier):
             self.is_middle_button_dragging = True
@@ -198,14 +193,13 @@ class InfiniteCanvas(QGraphicsView):
     def mouseMoveEvent(self, event):
         if event.buttons() == Qt.RightButton:
 
-            # Cancel the context menu timer if dragging
             if self.context_menu_timer.isActive():
                 self.context_menu_timer.stop()
 
             delta = event.globalPos() - self.drag_position
             self.move(self.x() + delta.x(), self.y() + delta.y())
             self.drag_position = event.globalPos()
-            self.right_button_pressed = False  # Set to False, indicating this is a drag, not a click
+            self.right_button_pressed = False  
 
 
         if self.is_middle_button_dragging:
@@ -220,11 +214,10 @@ class InfiniteCanvas(QGraphicsView):
 
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.RightButton:
-            # On releasing the right button, if no drag happened and the timer is not active, show the context menu
             if self.right_button_pressed and not self.context_menu_timer.isActive():
                 self.show_context_menu()
 
-            self.right_button_pressed = False  # Reset the flag
+            self.right_button_pressed = False 
 
         if event.button() == Qt.MiddleButton or (event.button() == Qt.LeftButton and event.modifiers() == Qt.AltModifier):
             self.is_middle_button_dragging = False
@@ -458,25 +451,27 @@ class InfiniteCanvas(QGraphicsView):
 
     ##CONTXT MNU
 
+
+    def create_context_menu_entries(self):
+        """Create a list of ContextMenuEntry widgets."""
+        copy_action = lambda: print("Copy action executed")  # Replace with actual logic
+        paste_action = lambda: print("Paste action executed")  # Replace with actual logic
+        settings_action = lambda: print("Settings action executed")  # Replace with actual logic
+
+        copy_entry = ContextMenuEntry("Copy", "CTRL + C", copy_action, self)
+        paste_entry = ContextMenuEntry("Paste", "CTRL + V", paste_action, self)
+        settings_entry = ContextMenuEntry("Settings", "CTRL + U", settings_action, self)
+
+        # Return the entries in the order they should appear
+        return [copy_entry, paste_entry, settings_entry]
+
     def show_context_menu(self):
         if self.context_menu_position:
-            menu = QMenu(self)
-            print("open settings menu")
-            settingsAction = QAction("Settings", self)
-            settingsAction.triggered.connect(self.openSettings)
-
-            menu.addAction(settingsAction)
-
+            menu = CustomContextMenu(self)
+            
+            # Create and populate the context menu with entries
+            entries = self.create_context_menu_entries()
+            menu.populate_context_menu(entries)
+            
             # Show the context menu at the stored position of the right-click event
             menu.exec_(self.context_menu_position)
-
-
-    def contextMenuEvent(self, event):
-        # Do nothing here, as we're now handling the context menu manually
-        pass
-
-    def openSettings(self):
-        print("Opening settings...")
-        if self.settingsWindow is None:
-            self.settingsWindow = SettingsWindow(self)
-        self.settingsWindow.show()
