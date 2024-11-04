@@ -1,11 +1,8 @@
-# custom_context_menu.py
 from PyQt5.QtWidgets import QMenu, QWidgetAction
-from context_menu_entry import ContextMenuEntry
 
 class CustomContextMenu(QMenu):
     def __init__(self, parent=None):
         super().__init__(parent)
-
 
         self.setStyleSheet("""
             QMenu {
@@ -33,7 +30,7 @@ class CustomContextMenu(QMenu):
         for i, entry_widget in enumerate(entries):  # Use enumerate directly on the list of entries
             widget_action = QWidgetAction(self)
             widget_action.setDefaultWidget(entry_widget)  # Embed the custom entry widget
-            widget_action.triggered.connect(entry_widget.trigger_action)
+            widget_action.triggered.connect(entry_widget.action)
 
             self.addAction(widget_action)
 

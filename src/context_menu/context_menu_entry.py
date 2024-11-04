@@ -1,6 +1,5 @@
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QLabel
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QColor
 
 class ContextMenuEntry(QWidget):
     def __init__(self, name, keybind, action, parent=None):
@@ -30,8 +29,3 @@ class ContextMenuEntry(QWidget):
 
         # Set the layout
         self.setLayout(layout)
-
-    def trigger_action(self):
-        """Execute the assigned action when called."""
-        if callable(self.action):
-            self.action()

@@ -17,8 +17,10 @@ from PyQt5.QtWidgets import QGraphicsView, QGraphicsScene, QMenu, QAction
 from settings_window import SettingsWindow
 from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout 
 from image_display import ImageDisplayWidget
-from context_menu import CustomContextMenu
-from context_menu_entry import ContextMenuEntry
+
+
+from context_menu.context_menu import CustomContextMenu
+from context_menu.show_context_menu import show_context_menu
 
 
 class InfiniteCanvas(QGraphicsView):
@@ -54,7 +56,7 @@ class InfiniteCanvas(QGraphicsView):
         self.drag_position = None
         self.context_menu_timer = QTimer(self)
         self.context_menu_timer.setSingleShot(True)
-        self.context_menu_timer.timeout.connect(self.show_context_menu)
+        self.context_menu_timer.timeout.connect(lambda: show_context_menu(self, self.context_menu_position))
         self.context_menu_event = None
         self.right_button_pressed = False
         self.context_menu_position = None
@@ -449,29 +451,3 @@ class InfiniteCanvas(QGraphicsView):
 
         self.scene.addItem(text_item)
 
-    ##CONTXT MNU
-
-
-    def create_context_menu_entries(self):
-        """Create a list of ContextMenuEntry widgets."""
-        copy_action = lambda: print("Copy action executed")  # Replace with actual logic
-        paste_action = lambda: print("Paste action executed")  # Replace with actual logic
-        settings_action = lambda: print("Settings action executed")  # Replace with actual logic
-
-        copy_entry = ContextMenuEntry("Copy", "CTRL + C", copy_action, self)
-        paste_entry = ContextMenuEntry("Paste", "CTRL + V", paste_action, self)
-        settings_entry = ContextMenuEntry("Settings", "CTRL + U", settings_action, self)
-
-        # Return the entries in the order they should appear
-        return [copy_entry, paste_entry, settings_entry]
-
-    def show_context_menu(self):
-        if self.context_menu_position:
-            menu = CustomContextMenu(self)
-            
-            # Create and populate the context menu with entries
-            entries = self.create_context_menu_entries()
-            menu.populate_context_menu(entries)
-            
-            # Show the context menu at the stored position of the right-click event
-            menu.exec_(self.context_menu_position)
