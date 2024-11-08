@@ -2,12 +2,12 @@ from PyQt5.QtWidgets import QWidget, QHBoxLayout, QLabel
 from PyQt5.QtCore import Qt
 
 class ContextMenuEntry(QWidget):
-    def __init__(self, name, keybind, action, parent=None):
+    def __init__(self, name, keybind, action=None, parent=None):
         super().__init__(parent)
 
         # Store the action for later execution
         self.action = action
-
+        self.name = name
         # Set up the layout
         layout = QHBoxLayout(self)
         layout.setContentsMargins(5, 5, 5, 5)

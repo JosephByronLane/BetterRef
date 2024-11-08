@@ -29,11 +29,18 @@ class CustomContextMenu(QMenu):
         """Populate the context menu with the provided entries."""
         for i, entry_widget in enumerate(entries):  # Use enumerate directly on the list of entries
             widget_action = QWidgetAction(self)
-            widget_action.setDefaultWidget(entry_widget)  # Embed the custom entry widget
-            widget_action.triggered.connect(entry_widget.action)
-
-            self.addAction(widget_action)
 
             # Add a separator after specific entries (e.g., after 'Copy' and 'Paste')
-            if i == 1:  # Adjust the index as needed to add separators after specific items
+            if entry_widget.name == "Spacer":  # Adjust the index as needed to add separators after specific items
                 self.addSeparator()
+                continue
+
+
+            widget_action.setDefaultWidget(entry_widget)  # Embed the custom entry widget
+
+            # Only connect if entry_widget.action is callable
+            if entry_widget.action is not None:
+                widget_action.triggered.connect(entry_widget.action)
+            
+            self.addAction(widget_action)
+
