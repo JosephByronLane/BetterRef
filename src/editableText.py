@@ -2,6 +2,7 @@ from PyQt5.QtWidgets import QGraphicsTextItem, QGraphicsItem, QMenu, QAction, QC
 from PyQt5.QtGui import QFont, QColor, QPen, QTextCursor, QTextCharFormat
 from PyQt5.QtCore import pyqtSignal, QObject, Qt
 from handle_item import HandleItem
+from text.text_toolbar import TextToolbar
 
 class ItemData(QObject):
     dataChanged = pyqtSignal()
@@ -15,6 +16,37 @@ class EditableTextItem(QGraphicsTextItem):
         
         self.handles = [HandleItem(self) for _ in range(4)]
         self.hideHandles()
+
+        self.toolbar = TextToolbar()
+
+    def mouseMoveEvent(self, event):
+        super().mouseMoveEvent(event)
+        if self.toolbar and self.isSelected():
+            view = self.scene().views()[0]
+            pos = view.mapFromScene(self.sceneBoundingRect().topRight())
+            global_pos = view.viewport().mapToGlobal(pos)
+            self.toolbar.move(global_pos.x(), global_pos.y() - self.toolbar.height())
+            
+    def itemChange(self, change, value):
+        if change == QGraphicsItem.ItemSelectedHasChanged:
+            if value:
+                self.showHandles()
+                # Show toolbar
+                if self.toolbar:
+                    self.toolbar.setEditableTextItem(self)
+                    # Position the toolbar near the text item
+                    view = self.scene().views()[0]  # Assuming one view
+                    pos = view.mapFromScene(self.sceneBoundingRect().topRight())
+                    global_pos = view.viewport().mapToGlobal(pos)
+                    self.toolbar.move(global_pos.x(), global_pos.y() - self.toolbar.height())
+                    self.toolbar.show()
+            else:
+                self.hideHandles()
+                # Hide toolbar
+                if self.toolbar:
+                    self.toolbar.hide()
+                    self.toolbar.setEditableTextItem(None)
+        return super().itemChange(change, value)
 
     def mouseDoubleClickEvent(self, event):
         self.setTextInteractionFlags(Qt.TextEditorInteraction)
@@ -142,13 +174,24 @@ class EditableTextItem(QGraphicsTextItem):
         return originalRect.adjusted(-outlineWidth, -outlineWidth, outlineWidth, outlineWidth)
 
     def itemChange(self, change, value):
-        if change == QGraphicsItem.ItemPositionHasChanged:
-            self.itemData.dataChanged.emit()
-        elif change == QGraphicsItem.ItemSelectedHasChanged:
+        if change == QGraphicsItem.ItemSelectedHasChanged:
             if value:
                 self.showHandles()
+                # Show toolbar
+                if self.toolbar:
+                    self.toolbar.setEditableTextItem(self)
+                    # Position the toolbar near the text item
+                    view = self.scene().views()[0]  # Assuming one view
+                    pos = view.mapFromScene(self.sceneBoundingRect().topRight())
+                    global_pos = view.viewport().mapToGlobal(pos)
+                    self.toolbar.move(global_pos.x(), global_pos.y() - self.toolbar.height())
+                    self.toolbar.show()
             else:
                 self.hideHandles()
+                # Hide toolbar
+                if self.toolbar:
+                    self.toolbar.hide()
+                    self.toolbar.setEditableTextItem(None)
         return super().itemChange(change, value)
 
     def paint(self, painter, option, widget=None):
