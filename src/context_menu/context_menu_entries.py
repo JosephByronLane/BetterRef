@@ -1,12 +1,12 @@
 # context_menu/context_menu_entries.py
 
 from context_menu.context_menu_entry import ContextMenuEntry  # Import the entry widget class
-
+from settings_menu.settings_menu import show_settings_window
 def create_context_menu_entries(parent):
     """Create a list of ContextMenuEntry widgets."""
     copy_action = lambda: print("Copy action executed")  # Replace with actual logic
     paste_action = lambda: print("Paste action executed")  # Replace with actual logic
-    settings_action = lambda: print("Settings action executed")  # Replace with actual logic
+    settings_action = lambda: globals().update(settings_window=show_settings_window())
     cut_action = lambda: print("Cut action executed")  # Replace with actual logic
     text_action = lambda: print("Text action executed")  # Replace with actual logic
     open_action = lambda: print("Open action executed")  # Replace with actual logic
