@@ -1,12 +1,14 @@
 from PyQt5.QtMultimedia import QMediaPlayer
 from PyQt5.QtMultimediaWidgets import QVideoWidget
-from PyQt5.QtCore import Qt, QUrl, pyqtSignal, QObject
-from PyQt5.QtWidgets import QGraphicsView, QGraphicsScene, QApplication, QGraphicsPixmapItem, QGraphicsItem, QMenu
+from PyQt5.QtCore import QUrl
+from PyQt5.QtWidgets import QGraphicsView, QGraphicsScene, QApplication, QGraphicsPixmapItem, QGraphicsItem
+from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
 from PyQt5.QtMultimediaWidgets import QVideoWidget, QGraphicsVideoItem
-from PyQt5.QtMultimedia import QMediaContent
-from PyQt5.QtCore import pyqtSignal, QObject
-from PyQt5.QtWidgets import QPushButton, QSlider, QVBoxLayout, QWidget
-
+from PyQt5.QtCore import pyqtSignal, QObject, Qt
+from PyQt5.QtWidgets import QPushButton, QSlider, QGraphicsProxyWidget, QHBoxLayout, QWidget
+from PyQt5.QtGui import QPainter, QPen, QColor
+from handle_item import HandleItem
+from PyQt5.QtGui import QMouseEvent
 
 class ItemData(QObject):
     dataChanged = pyqtSignal()
@@ -16,49 +18,75 @@ class VideoGraphicsItem(QGraphicsVideoItem):
         super().__init__(parent)
         self.setFlag(QGraphicsItem.ItemIsSelectable, True)
         self.setFlag(QGraphicsItem.ItemIsMovable, True)
+        self.url = url
 
-        # Initialize media player
+        self.handles = [HandleItem(self) for _ in range(4)]  
+        self.hideHandles() 
+
+        self.initUI(url)
+
+        self.itemData = ItemData()
+
+    def initUI(self, url):
         self.mediaPlayer = QMediaPlayer(None, QMediaPlayer.VideoSurface)
         self.mediaPlayer.setVideoOutput(self)
         self.mediaPlayer.setMedia(QMediaContent(QUrl.fromLocalFile(url)))
-        self.mediaPlayer.play()  # Start playing immediately; adjust as needed
 
-        # Metadata and signaling for changes
-        self.itemData = ItemData()
-        self.url = url  # Store video URL for saving/loading state
+        controlWidget = QWidget()
+        layout = QHBoxLayout()
+        self.playPauseButton = QPushButton("Pause") 
+        self.playPauseButton.clicked.connect(self.togglePlayPause)
+        layout.addWidget(self.playPauseButton)
 
-        # Layout for controls
-        self.layout = QVBoxLayout()
-        self.playPauseButton = QPushButton("Pause")
-        self.playPauseButton.clicked.connect(self.togglePlay)
-        self.timeline = QSlider(Qt.Horizontal)
-        self.timeline.setMaximum(1000)  # Assuming 1000 steps
-        self.timeline.sliderMoved.connect(self.setVideoPosition)
-        self.layout.addWidget(self.playPauseButton)
-        self.layout.addWidget(self.timeline)
-        self.setLayout(self.layout)
+        self.progressBar = QSlider(Qt.Horizontal)
+        self.progressBar.setRange(0, 100)
+        layout.addWidget(self.progressBar)
+        controlWidget.setLayout(layout)
 
-    def contextMenuEvent(self, event):
-        menu = QMenu()
-        playAction = menu.addAction("Play")
-        pauseAction = menu.addAction("Pause")
-        stopAction = menu.addAction("Stop")
+        self.controlsProxy = QGraphicsProxyWidget(self)
+        self.controlsProxy.setWidget(controlWidget)
+        self.controlsProxy.setPos(0, self.boundingRect().height())  
 
-        action = menu.exec_(event.screenPos())
-        if action == playAction:
-            self.player.play()
-        elif action == pauseAction:
-            self.player.pause()
-        elif action == stopAction:
-            self.player.stop()
+        self.mediaPlayer.positionChanged.connect(self.updateProgressBar)
+        self.mediaPlayer.durationChanged.connect(self.updateProgressBar)
+        
+        self.mediaPlayer.play() 
+
+        self.updateControlWidgetSize()
+
+    def togglePlayPause(self):
+        if self.mediaPlayer.state() == QMediaPlayer.PlayingState:
+            self.mediaPlayer.pause()
+            self.playPauseButton.setText('Play')
+        else:
+            self.mediaPlayer.play()
+            self.playPauseButton.setText('Pause')
+
+    def updateProgressBar(self):
+        duration = self.mediaPlayer.duration()
+        position = self.mediaPlayer.position()
+        if duration > 0:
+            progress = int((position / duration) * 100)
+            self.progressBar.setValue(progress)
+
+        # Update control positioning and size
+        self.updateControlWidgetSize()
+
+    def updateControlWidgetSize(self):
+        videoWidth = int(self.boundingRect().width())  # Cast to int
+        self.controlsProxy.setPos(0, self.boundingRect().height())
+        self.controlsProxy.widget().setFixedWidth(videoWidth)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        # Reposition controls when the video item is resized
+        self.updateControlWidgetSize()
 
     def togglePlay(self):
         if self.mediaPlayer.state() == QMediaPlayer.PlayingState:
             self.mediaPlayer.pause()
-            self.playPauseButton.setText("Play")
         else:
             self.mediaPlayer.play()
-            self.playPauseButton.setText("Pause")
 
     def setPosition(self, position):
         self.mediaPlayer.setPosition(position)
@@ -76,7 +104,7 @@ class VideoGraphicsItem(QGraphicsVideoItem):
 
     def collectItemData(self):
         items_data = []
-        for item in self.scene.items():
+        for item in self.scene().items():
             if isinstance(item, VideoGraphicsItem):
                 data = {
                     "file_path": item.url,
@@ -88,30 +116,80 @@ class VideoGraphicsItem(QGraphicsVideoItem):
                 }
                 items_data.append(data)
             # Include similar handling for images if mixed content
-        return items_data
-    
+        return items_data    
 
-    def setVideoPosition(self, position):
-        # Calculate the position in the video to seek to
-        videoLength = self.mediaPlayer.duration()
-        seekPosition = videoLength * (position / 1000)
-        self.mediaPlayer.setPosition(seekPosition)
+    def boundingRect(self):
+        originalRect = super().boundingRect()
+        outlineWidth = 3  # Same as the outline pen width
+        return originalRect.adjusted(-outlineWidth, -outlineWidth, outlineWidth, outlineWidth)
 
-    def updateSlider(self):
-        currentPosition = self.mediaPlayer.position()
-        totalDuration = self.mediaPlayer.duration()
-        if totalDuration > 0:
-            sliderValue = 1000 * currentPosition / totalDuration
-            self.timeline.setValue(int(sliderValue))
-
+    def paint(self, painter, option, widget=None):
+        super().paint(painter, option, widget)
+        if self.isSelected():
+            painter.setPen(QPen(QColor('blue'), 3))
+            painter.drawRect(self.boundingRect().adjusted(3, 3, -3, -3))
+    def itemChange(self, change, value):
+        if change == QGraphicsItem.ItemSelectedHasChanged:
+            if value:
+                self.showHandles()
+            else:
+                self.hideHandles()
+        return super().itemChange(change, value)
     def updateHandles(self):
         if not self.isSelected():
             for handle in self.handles:
                 handle.hide()
+            return
+
+        # Ensure handles are shown and correctly positioned around the image
+        rect = self.boundingRect()
+        corners = [rect.topLeft(), rect.topRight(), rect.bottomRight(), rect.bottomLeft()]
+        for handle, pos in zip(self.handles, corners):
+            handle.setPos(self.mapToScene(pos))
+            handle.show()
+    def hideHandles(self):
+        for handle in self.handles:
+            handle.hide()
+
+    def showHandles(self):
+        self.positionHandles()
+        for handle in self.handles:
+            handle.show()
+
+    def positionHandles(self):
+        rect = self.boundingRect()
+        # Adjust handle positions to be at the corners of the video item
+        self.handles[0].setPos(rect.topLeft())
+        self.handles[1].setPos(rect.topRight())
+        self.handles[2].setPos(rect.bottomRight())
+        self.handles[3].setPos(rect.bottomLeft())
+
+    def paint(self, painter, option, widget=None):
+        super().paint(painter, option, widget)
+        if self.isSelected():
+            painter.setPen(QPen(QColor('blue'), 3))
+            painter.drawRect(self.boundingRect())
+            self.showHandles()
         else:
-            # Ensure handles are shown and correctly positioned around the video
-            rect = self.boundingRect()
-            corners = [rect.topLeft(), rect.topRight(), rect.bottomRight(), rect.bottomLeft()]
-            for handle, pos in zip(self.handles, corners):
-                handle.setPos(self.mapToScene(pos))
-                handle.show()
+            self.hideHandles()
+
+
+    def mousePressEvent(self, event: QMouseEvent):
+        if event.button() == Qt.LeftButton:
+            self.dragging = True
+            self.setCursor(Qt.ClosedHandCursor)
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event: QMouseEvent):
+        if self.isSelected():
+            self.scene().update()
+        if self.dragging:
+            super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event: QMouseEvent):
+        if event.button() == Qt.LeftButton and self.dragging:
+            self.dragging = False
+            self.setCursor(Qt.ArrowCursor)
+            self.itemData.dataChanged.emit()
+
+        super().mouseReleaseEvent(event)

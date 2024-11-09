@@ -29,13 +29,14 @@ class SelectableImageItem(QGraphicsPixmapItem):
                 handle.hide()
             return
 
-        # Recalculate the handle positions after a scale or move operation
-        rect = self.boundingRect().adjusted(-10, -10, 10, 10)  # Adjust if your handle size is different
-        self.handles[0].setPos(self.mapToScene(rect.topLeft()))
-        self.handles[1].setPos(self.mapToScene(rect.topRight()))
-        self.handles[2].setPos(self.mapToScene(rect.bottomRight()))
-        self.handles[3].setPos(self.mapToScene(rect.bottomLeft()))
-        for handle in self.handles:
+        rect = self.boundingRect()
+        corners = [rect.topLeft(), rect.topRight(), rect.bottomRight(), rect.bottomLeft()]
+        for handle, pos in zip(self.handles, corners):
+            # Calculate the scene position of the bounding box corners
+            scene_pos = self.mapToScene(self.mapFromItem(self, pos))
+            print(f"Handle to-be pos: {pos}, Scene pos: {scene_pos}")
+            handle.setPos(scene_pos)
+            print(f"Handle Position: {handle.pos()}")
             handle.show()
 
 

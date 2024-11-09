@@ -21,6 +21,8 @@ class EditableTextItem(QGraphicsTextItem):
         self.setFocus()
         self.itemData.dataChanged.emit()
 
+        self.itemData.dataChanged.emit()
+
         super().mouseDoubleClickEvent(event)
 
     def keyPressEvent(self, event):

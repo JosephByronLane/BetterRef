@@ -1,18 +1,26 @@
 import sys
-from PyQt5.QtWidgets import QGraphicsView, QGraphicsScene, QApplication, QGraphicsPixmapItem
-from PyQt5.QtGui import QColor, QPainter, QPixmap, QDragEnterEvent, QDropEvent, QPen
-from PyQt5.QtCore import Qt, QUrl, pyqtSignal, QObject, QRectF, QPointF, QEvent
+from PyQt5.QtWidgets import QGraphicsView, QGraphicsScene, QApplication, QGraphicsPixmapItem, QWidget 
+from PyQt5.QtGui import QColor, QPainter, QPixmap, QDragEnterEvent, QDropEvent, QPen, QFont, QContextMenuEvent
+from PyQt5.QtCore import Qt, QUrl, pyqtSignal, QObject, QRectF, QPointF, QEvent, QTimer, QPoint  
 from selectable_item import SelectableImageItem
 from PyQt5.QtWidgets import QAction
 import json
 from PyQt5.QtWidgets import QFileDialog
 from video_player import VideoGraphicsItem
 from PyQt5.QtMultimediaWidgets import QVideoWidget
-from PyQt5.QtWidgets import QGraphicsTextItem, QGraphicsItem
-from PyQt5.QtWidgets import QGraphicsProxyWidget, QLineEdit, QGraphicsSceneMouseEvent, QGraphicsRectItem, QGraphicsTextItem
+from PyQt5.QtWidgets import QGraphicsTextItem, QGraphicsItem, QGraphicsProxyWidget
+from PyQt5.QtWidgets import QAction, QLineEdit, QGraphicsSceneMouseEvent, QGraphicsRectItem, QGraphicsItemGroup, QMessageBox
 from PyQt5.QtGui import QCursor
 from editableText import EditableTextItem
+from handle_item import HandleItem
+from PyQt5.QtWidgets import QGraphicsView, QGraphicsScene, QMenu, QAction
+from settings_window import SettingsWindow
+from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout 
+from image_display import ImageDisplayWidget
 
+
+from context_menu.context_menu import CustomContextMenu
+from context_menu.show_context_menu import show_context_menu
 
 
 class InfiniteCanvas(QGraphicsView):
@@ -21,6 +29,7 @@ class InfiniteCanvas(QGraphicsView):
 
         self.text_edit = None
         self.text_input_placeholder = None
+        self.settingsWindow = None
 
         self.scene = QGraphicsScene(self)
         self.setScene(self.scene)
@@ -36,50 +45,186 @@ class InfiniteCanvas(QGraphicsView):
         self.setRenderHint(QPainter.Antialiasing, False)
         self.setWindowTitle("BetterRef")
         self.selectedItem = None
-
+        self.group = None 
+        self.groupBoundingBox = None
         self.is_middle_button_dragging = False
         self.last_drag_position = None
         self.setShortcut()
 
 
+        #context menu
+        self.drag_position = None
+        self.context_menu_timer = QTimer(self)
+        self.context_menu_timer.setSingleShot(True)
+        self.context_menu_timer.timeout.connect(lambda: show_context_menu(self, self.context_menu_position))
+        self.context_menu_event = None
+        self.right_button_pressed = False
+        self.context_menu_position = None
+
+        self.custom_context_menu = CustomContextMenu(self)
+
+        self.addImageDisplayWidget()
+
+    def addImageDisplayWidget(self):
+        self.image_display_widget = ImageDisplayWidget(canvas_instance=self)
+
+        container_widget = QWidget()
+        container_layout = QVBoxLayout(container_widget)
+        container_layout.addWidget(self.image_display_widget)
+        container_layout.setContentsMargins(10, 10, 10, 10)  
+
+        container_widget.setObjectName("imageDisplayContainer")
+
+        container_widget.setStyleSheet("""
+            QWidget#imageDisplayContainer {
+                background: transparent;
+                border: 2px dotted #5F5F5F;  /* Dotted border with blue color */
+                border-radius:10px;
+            }
+        """)
+
+        proxy_widget = QGraphicsProxyWidget()
+        proxy_widget.setWidget(container_widget)
+
+        self.scene.addItem(proxy_widget)
+
+        scene_width = self.scene.width()
+        scene_height = self.scene.height()
+
+        widget_width = container_widget.width()
+        widget_height = container_widget.height()
+
+        center_x = (scene_width - widget_width) / 2
+        center_y = (scene_height - widget_height) / 2
+
+        proxy_widget.setPos(center_x, center_y)
+
+
+
+    def selectAllItems(self):
+        for item in self.scene.items():
+            item.setSelected(True)
+        self.groupSelectedItems()
+
+    def groupSelectedItems(self):
+        if self.group:
+            self.scene.removeItem(self.group) 
+            self.scene.removeItem(self.groupBoundingBox)  
+
+        self.group = QGraphicsItemGroup()
+        for item in self.scene.selectedItems():
+            item.setSelected(False)  
+            self.group.addToGroup(item)
+
+        self.scene.addItem(self.group)
+        self.group.setFlags(QGraphicsItem.ItemIsMovable | QGraphicsItem.ItemIsSelectable | QGraphicsItem.ItemIsFocusable)
+        self.group.setFiltersChildEvents(False)  
+
+        self.groupBoundingBox = QGraphicsRectItem(self.group.boundingRect())
+        self.groupBoundingBox.setPen(QPen(QColor('blue'), 3))
+        self.groupBoundingBox.setBrush(QColor(0, 0, 0, 0))  
+        self.groupBoundingBox.setParentItem(self.group)
+        self.groupBoundingBox.setZValue(self.group.zValue() - 1)  
+        
+        self.groupBoundingBox.handles = [HandleItem(self.groupBoundingBox) for _ in range(4)]
+        self.updateGroupHandles()
+        
+
+    def hideGroupHandles(self):
+        if self.groupBoundingBox:
+            for handle in self.groupBoundingBox.handles:
+                handle.hide()
+            self.groupBoundingBox.hide()
+
+    def updateGroupHandles(self):
+        if not self.groupBoundingBox:
+            return
+
+        rect = self.groupBoundingBox.rect()
+        corners = [rect.topLeft(), rect.topRight(), rect.bottomRight(), rect.bottomLeft()]
+        for handle, pos in zip(self.groupBoundingBox.handles, corners):
+            handle.setPos(pos)
+            handle.show()
+
+    def deselectGroup(self):
+        if self.groupBoundingBox:
+            for handle in self.groupBoundingBox.handles:
+                handle.hide()
+            self.groupBoundingBox.hide()
+        if self.group:
+            items = self.group.childItems()
+            for item in items:
+                self.group.removeFromGroup(item)
+                self.scene.addItem(item)
+            self.scene.removeItem(self.group)
+            self.group = None
+
+
     def mousePressEvent(self, event):
         if event.button() == Qt.RightButton:
             self.drag_position = event.globalPos()
+
+            self.right_button_pressed = True
+            self.context_menu_position = event.globalPos()  
+
+            self.context_menu_event = event
+            self.context_menu_timer.start(200)  
+
         if event.button() == Qt.MiddleButton or (event.button() == Qt.LeftButton and event.modifiers() == Qt.AltModifier):
             self.is_middle_button_dragging = True
             self.last_drag_position = event.pos()
             self.setCursor(Qt.ClosedHandCursor)
+
         else:
             item = self.itemAt(event.pos())
-            if item and isinstance(item, SelectableImageItem):
-                if self.selectedItem:
+            if item:
+                if self.selectedItem and self.selectedItem != item:
                     self.selectedItem.setSelected(False)
                 item.setSelected(True)
                 self.selectedItem = item
+                self.scene.update()
             else:
                 if self.selectedItem:
                     self.selectedItem.setSelected(False)
                     self.selectedItem = None
+                if self.group:
+                    self.deselectGroup()
+                self.scene.update()
             super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
         if event.buttons() == Qt.RightButton:
+
+            if self.context_menu_timer.isActive():
+                self.context_menu_timer.stop()
+
             delta = event.globalPos() - self.drag_position
             self.move(self.x() + delta.x(), self.y() + delta.y())
             self.drag_position = event.globalPos()
+            self.right_button_pressed = False  
+
+
         if self.is_middle_button_dragging:
             delta = event.pos() - self.last_drag_position
             self.last_drag_position = event.pos()
 
             self.horizontalScrollBar().setValue(self.horizontalScrollBar().value() - delta.x())
             self.verticalScrollBar().setValue(self.verticalScrollBar().value() - delta.y())
+
         else:
             super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
+        if event.button() == Qt.RightButton:
+            if self.right_button_pressed and not self.context_menu_timer.isActive():
+                self.show_context_menu()
+
+            self.right_button_pressed = False 
+
         if event.button() == Qt.MiddleButton or (event.button() == Qt.LeftButton and event.modifiers() == Qt.AltModifier):
             self.is_middle_button_dragging = False
             self.setCursor(Qt.ArrowCursor)
+
         else:
             super().mouseReleaseEvent(event)
 
@@ -92,16 +237,20 @@ class InfiniteCanvas(QGraphicsView):
             super().keyPressEvent(event)
     
     def addTextItem(self):
-        mouse_pos = self.mapToScene(self.mapFromGlobal(QCursor.pos()))  # Convert global mouse position to scene coordinates
+        mouse_pos = self.mapToScene(self.mapFromGlobal(QCursor.pos()))  
         text_item = EditableTextItem("Text")
-        text_item.setDefaultTextColor(Qt.white)  # Set text color
-        text_item.setFlags(QGraphicsItem.ItemIsMovable | QGraphicsItem.ItemIsSelectable)  # Make text item movable and selectable
-        text_item.setPos(mouse_pos)  # Set position at the mouse position in the scene
+        text_item.setDefaultTextColor(Qt.white) 
+
+        font = text_item.font()
+        font.setPointSize(24)  
+        text_item.setFont(font)
+
+        text_item.setFlags(QGraphicsItem.ItemIsMovable | QGraphicsItem.ItemIsSelectable) 
+        text_item.setPos(mouse_pos)
         self.scene.addItem(text_item)
         text_item.setTextInteractionFlags(Qt.TextEditorInteraction)
         text_item.setFocus()
-        text_item.setTextInteractionFlags(Qt.NoTextInteraction)
-        
+        text_item.setTextInteractionFlags(Qt.NoTextInteraction)       
 
 
     def closeEvent(self, event):
@@ -121,20 +270,24 @@ class InfiniteCanvas(QGraphicsView):
             url = event.mimeData().urls()[0]
             file_path = url.toLocalFile()
 
-            if file_path.lower().endswith(('.mp4', '.avi', '.mov')):  # Check for common video file extensions
-                pos = event.pos()
-                self.addVideoToScene(file_path, pos)
+            if file_path.lower().endswith(('.mp4', '.avi', '.mov')):  
+                self.addVideoToScene(file_path, event.pos())
+            elif file_path.lower().endswith(('.png', '.jpg', '.webp')):  
+                self.addImageToScene(file_path, event.pos()) 
             else:
-                self.addImageToScene(file_path, event.pos())  # Existing method for images
-
+                QMessageBox.critical(self, "Error", "Unsupported file format. Please drop a supported file (mp4, avi, mov, png, jpg, webp).")
+                
     def addVideoToScene(self, file_path, position):
+        print("adding video")
         videoItem = VideoGraphicsItem(file_path)
-        # Adjust position so the video appears centered on the cursor
-        videoRect = videoItem.boundingRect()
-        adjustedPos = QPointF(position.x() - videoRect.width() / 2, position.y() - videoRect.height() / 2)
-        videoItem.setPos(adjustedPos)
+        videoItem.setData(0, file_path)  
+
+        videoItem.setPos(position)
+        videoItem.setScale(6.0)  
+
         self.scene.addItem(videoItem)
-        videoItem.itemData.dataChanged.connect(self.updateItemData)
+        videoItem.itemData.dataChanged.connect(lambda item=videoItem: self.updateItemData(item))
+        print("video added")
 
     def addImageToScene(self, image_path, position):
         pixmap = QPixmap(image_path)
@@ -180,18 +333,42 @@ class InfiniteCanvas(QGraphicsView):
         self.openAction.triggered.connect(self.loadFromFile)
         self.addAction(self.openAction)
 
-
-
+        selectAllAction = QAction("Select All", self)
+        selectAllAction.setShortcut("Ctrl+A")
+        selectAllAction.triggered.connect(self.selectAllItems)
+        self.addAction(selectAllAction)
 
     def collectItemData(self):
         items_data = []
         for item in self.scene.items():
             if isinstance(item, SelectableImageItem):
                 data = {
-                    "image_path": item.data(0),  
+                    "type": "image",
+                    "image_path": item.data(0),
                     "position": {"x": item.x(), "y": item.y()},
                     "rotation": item.rotation(),
-                    "scale": item.scale() 
+                    "scale": item.scale()
+                }
+                items_data.append(data)
+            elif isinstance(item, VideoGraphicsItem):
+                data = {
+                    "type": "video",
+                    "file_path": item.url,
+                    "position": {"x": item.x(), "y": item.y()},
+                    "rotation": item.rotation(),
+                    "scale": item.scale(),
+                    "media_position": item.mediaPlayer.position() 
+                }
+                items_data.append(data)
+            elif isinstance(item, EditableTextItem):
+                data = {
+                    "type": "text",
+                    "text": item.toPlainText(),
+                    "position": {"x": item.x(), "y": item.y()},
+                    "scale": item.scale(),
+                    "font": item.font().toString(),
+                    "color": item.defaultTextColor().name() 
+
                 }
                 items_data.append(data)
         return items_data
@@ -204,40 +381,42 @@ class InfiniteCanvas(QGraphicsView):
                 json.dump(items_data, file, indent=4)
             print(f"File saved: {file_path}") 
 
-    def loadFromFile(self, file_path):
-        with open(file_path, 'r') as file:
-            items_data = json.load(file)
-        for data in items_data:
-            self.addImageFromData(data)
-
-    def addImageFromData(self, data):
-        image_path = data["image_path"]
-        position = QPointF(data["position"]["x"], data["position"]["y"])
-        scale_x = data["scale"]["x"]
-        scale_y = data["scale"]["y"]
-        rotation = data["rotation"]
-        pixmap = QPixmap(image_path)
-        item = SelectableImageItem(pixmap)
-        item.setData(0, image_path)
-        item.setPos(position)
-        item.setScale(scale_x) 
-        item.setRotation(rotation)
-        self.scene.addItem(item)
-
-        ##LOAD SHIT
-
-
-    def loadFromFile(self):            
-            file_path, _ = QFileDialog.getOpenFileName(self, "Open File", "", "BetterRef Files (*.brf)")
-            if file_path:
+    def loadFromFile(self):
+        file_path, _ = QFileDialog.getOpenFileName(self, "Open File", "", "BetterRef Files (*.brf)")
+        if file_path:
+            try:
                 with open(file_path, 'r') as file:
                     items_data = json.load(file)
                 self.restoreScene(items_data)
+                print(f"Scene loaded successfully from {file_path}")
+            except Exception as e:
+                print(f"Error loading file: {e}")
 
     def restoreScene(self, items_data):
-        self.scene.clear()  
+        self.scene.clear()
         for data in items_data:
-            self.addImageFromData(data)
+            if data["type"] == "image":
+                self.addImageFromData(data)
+            elif data["type"] == "video":
+                self.addVideoFromData(data)
+            elif data["type"] == "text":
+                self.addTextFromData(data)
+        self.scene.update()
+        print(f"Scene restored with {len(items_data)} items")
+
+    def addVideoFromData(self, data):
+        file_path = data["file_path"]
+        position = QPointF(data["position"]["x"], data["position"]["y"])
+        scale = data.get("scale", 1)
+        rotation = data.get("rotation", 0)
+        media_position = data.get("media_position", 0)
+
+        videoItem = VideoGraphicsItem(file_path)
+        videoItem.setPos(position)
+        videoItem.setScale(scale)
+        videoItem.setRotation(rotation)
+        videoItem.mediaPlayer.setPosition(media_position) 
+        self.scene.addItem(videoItem)
 
     def addImageFromData(self, data):
         image_path = data["image_path"]
@@ -253,3 +432,22 @@ class InfiniteCanvas(QGraphicsView):
             item.setRotation(rotation)
             item.setTransformOriginPoint(pixmap.width() / 2, pixmap.height() / 2)
             self.scene.addItem(item)
+
+    def addTextFromData(self, data):
+        text = data["text"]
+        position = QPointF(data["position"]["x"], data["position"]["y"])
+        scale = data.get("scale", 1)
+        font_str = data.get("font", "")
+        color_str = data.get("color", "#FFFFFF") 
+
+        text_item = EditableTextItem(text)
+        text_item.setPos(position)
+        text_item.setScale(scale)
+        if font_str:
+            font = QFont()
+            font.fromString(font_str)
+            text_item.setFont(font)
+        text_item.setDefaultTextColor(QColor(color_str)) 
+
+        self.scene.addItem(text_item)
+
