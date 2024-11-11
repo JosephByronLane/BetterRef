@@ -18,6 +18,7 @@ from PyQt5.QtWidgets import QGraphicsView, QGraphicsScene, QMenu, QAction
 from settings_window import SettingsWindow
 from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout 
 from image_display import ImageDisplayWidget
+import math
 
 
 from context_menu.context_menu import CustomContextMenu
@@ -32,7 +33,7 @@ class InfiniteCanvas(QGraphicsView):
         self.text_input_placeholder = None
         self.settingsWindow = None
 
-        self.scene = QGraphicsScene(self)
+        self.scene = QGraphicsScene()
         self.setScene(self.scene)
 
         self.setSceneRect(-100000000, -100000000, 200000000, 200000000)
@@ -52,6 +53,9 @@ class InfiniteCanvas(QGraphicsView):
         self.last_drag_position = None
         self.setShortcut()
 
+
+        self.tile_spacing = 1  # Espacio entre imágenes
+        self.images = []
 
         #context menu
         self.drag_position = None
@@ -259,6 +263,12 @@ class InfiniteCanvas(QGraphicsView):
         text_item.setTextInteractionFlags(Qt.NoTextInteraction)       
 
 
+    def removeItem(self):
+        for item in self.scene.selectedItems():
+            self.scene.removeItem(item)
+            del item 
+
+
     def closeEvent(self, event):
         event.accept()
         sys.exit(0)
@@ -270,19 +280,20 @@ class InfiniteCanvas(QGraphicsView):
     def dragMoveEvent(self, event: QDragEnterEvent):
         if event.mimeData().hasUrls():
             event.acceptProposedAction()
-            
+
     def dropEvent(self, event: QDropEvent):
         if event.mimeData().hasUrls():
-            url = event.mimeData().urls()[0]
-            file_path = url.toLocalFile()
+            urls = event.mimeData().urls()  # Obtener todas las URLs de los archivos
+            for url in urls:
+                file_path = url.toLocalFile()
 
-            if file_path.lower().endswith(('.mp4', '.avi', '.mov')):  
-                self.addVideoToScene(file_path, event.pos())
-            elif file_path.lower().endswith(('.png', '.jpg', '.webp')):  
-                self.addImageToScene(file_path, event.pos()) 
-            else:
-                QMessageBox.critical(self, "Error", "Unsupported file format. Please drop a supported file (mp4, avi, mov, png, jpg, webp).")
-                
+                if file_path.lower().endswith(('.mp4', '.avi', '.mov')):  
+                    self.addVideoToScene(file_path, event.pos())
+                elif file_path.lower().endswith(('.png', '.jpg', '.webp')):  
+                    self.addImageToScene(file_path, event.pos())  # Agregar imagen a la escena
+                else:
+                    QMessageBox.critical(self, "Error", "Unsupported file format. Please drop a supported file (mp4, avi, mov, png, jpg, webp).")
+
     def addVideoToScene(self, file_path, position):
         self.hideImageDisplayWidget()
 
@@ -297,19 +308,39 @@ class InfiniteCanvas(QGraphicsView):
         videoItem.itemData.dataChanged.connect(lambda item=videoItem: self.updateItemData(item))
         print("video added")
 
-    def addImageToScene(self, image_path, position):
-        self.hideImageDisplayWidget()
-
+    def addImageToScene(self, image_path, position=None):
         pixmap = QPixmap(image_path)
         if not pixmap.isNull():
             item = SelectableImageItem(pixmap)
-            item.setData(0, image_path)  
-            item.setPos(position)
-            item.setScale(1) 
-            item.setRotation(0)  
-            item.setTransformOriginPoint(pixmap.width() / 2, pixmap.height() / 2) 
+            item.setData(0, image_path)
+            
+            # Añadir la imagen al arreglo de imágenes
+            self.images.append(item)
             self.scene.addItem(item)
-            item.itemData.dataChanged.connect(lambda item=item: self.updateItemData(item))
+            
+            # Distribuir en mosaico
+            self.arrangeImagesInGrid()
+
+    def arrangeImagesInGrid(self):
+        # Calcular la cuadrícula en función de la cantidad de imágenes
+        count = len(self.images)
+        grid_size = math.ceil(math.sqrt(count))  # Tamaño de la cuadrícula (ej. 2x2, 3x3, etc.)
+
+        # Tamaño del elemento individual (obtenemos el tamaño del primer item si es posible)
+        if self.images:
+            item_width = self.images[0].pixmap().width()
+            item_height = self.images[0].pixmap().height()
+
+            # Colocar cada imagen en su posición de mosaico
+            for index, item in enumerate(self.images):
+                row = index // grid_size
+                col = index % grid_size
+                x = col * (item_width + self.tile_spacing)
+                y = row * (item_height + self.tile_spacing)
+                
+                # Establecer la posición en el mosaico
+                item.setPos(x, y)
+
 
     def updateItemData(self, item):
         data = {
@@ -347,6 +378,11 @@ class InfiniteCanvas(QGraphicsView):
         selectAllAction.setShortcut("Ctrl+A")
         selectAllAction.triggered.connect(self.selectAllItems)
         self.addAction(selectAllAction)
+
+        deleteAction = QAction("Delete Item", self)
+        deleteAction.setShortcut("Backspace")  # Asignar Backspace como atajo
+        deleteAction.triggered.connect(self.removeItem)
+        self.addAction(deleteAction)
 
     def collectItemData(self):
         items_data = []
