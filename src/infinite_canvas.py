@@ -238,15 +238,15 @@ class InfiniteCanvas(QGraphicsView):
     def addTextItem(self):
         self.hideImageDisplayWidget()
 
-        mouse_pos = self.mapToScene(self.mapFromGlobal(QCursor.pos()))  
-
+        mouse_pos = self.mapToScene(self.mapFromGlobal(QCursor.pos()))
+        print("Adding text item at:", mouse_pos)
         toolbar = TextToolbar()
 
-        text_item = EditableTextItem("Sample Text", toolbar=toolbar)
+        text_item = EditableTextItem("Sample Text")
         text_item.setDefaultTextColor(Qt.white) 
 
         font = text_item.font()
-        font.setPointSize(24)  
+        font.setPointSize(12)  
         text_item.setFont(font)
 
         text_item.setFlags(QGraphicsItem.ItemIsMovable | QGraphicsItem.ItemIsSelectable) 

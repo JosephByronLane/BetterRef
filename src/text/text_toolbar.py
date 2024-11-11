@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QWidget, QPushButton, QHBoxLayout, QComboBox, QColorDialog
+from PyQt5.QtWidgets import QWidget, QPushButton, QHBoxLayout, QComboBox, QColorDialog, QFrame
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QColor, QFontDatabase, QFont
 
@@ -6,30 +6,33 @@ class TextToolbar(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
 
-        # Set window properties
-        self.setWindowFlags(Qt.FramelessWindowHint | Qt.Tool | Qt.WindowStaysOnTopHint)
-        self.setAttribute(Qt.WA_TranslucentBackground)
-        self.setStyleSheet("background-color: black;")
-        self.setFocusPolicy(Qt.NoFocus)
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.Tool)
+        self.setStyleSheet("background-color: #202020;")
+        self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)
 
-        self.editableTextItem = None  # Will be set when a text item is selected
+        self.editableTextItem = None  
 
-        # Check if 'Inter' font is available
         font_db = QFontDatabase()
         if 'Inter' in font_db.families():
             inter_font_family = 'Inter'
         else:
             inter_font_family = self.font().family()  # Use default font
 
-        # Create UI elements
+        self.frame = QFrame()
+        self.frame.setStyleSheet("""
+            QFrame {
+                background-color: #202020;
+                border: 2px solid white;
+                border-radius: 8px;
+            }
+        """)
+
         h_layout = QHBoxLayout()
         h_layout.setContentsMargins(10, 10, 10, 10)  # Increased margins for a bigger UI
         h_layout.setSpacing(10)  # Increased spacing between elements
 
-        # Adjust font sizes
         self.button_font_size = 20  # Font size for buttons
 
-        # Color button with "A" icon
         self.colorButton = QPushButton("A")
         self.colorButton.setFixedSize(40, 40)
         self.colorButton.setStyleSheet(
@@ -43,14 +46,12 @@ class TextToolbar(QWidget):
         self.colorButton.clicked.connect(self.changeTextColor)
         h_layout.addWidget(self.colorButton)
 
-        # Vertical separator
         separator1 = QWidget()
         separator1.setFixedWidth(2)
         separator1.setFixedHeight(40)
         separator1.setStyleSheet("background-color: white;")
         h_layout.addWidget(separator1)
 
-        # Bold button
         self.boldButton = QPushButton("B")
         self.boldButton.setFixedSize(40, 40)
         self.boldButton.setCheckable(True)
@@ -70,7 +71,6 @@ class TextToolbar(QWidget):
         self.boldButton.clicked.connect(self.toggleBold)
         h_layout.addWidget(self.boldButton)
 
-        # Italic button
         self.italicButton = QPushButton("I")
         self.italicButton.setFixedSize(40, 40)
         self.italicButton.setCheckable(True)
@@ -90,14 +90,12 @@ class TextToolbar(QWidget):
         self.italicButton.clicked.connect(self.toggleItalic)
         h_layout.addWidget(self.italicButton)
 
-        # Vertical separator
         separator2 = QWidget()
         separator2.setFixedWidth(2)
         separator2.setFixedHeight(40)
         separator2.setStyleSheet("background-color: white;")
         h_layout.addWidget(separator2)
 
-        # Font size dropdown
         self.fontSizeComboBox = QComboBox()
         self.fontSizeComboBox.setFixedHeight(40)
         self.fontSizeComboBox.setEditable(True)
@@ -147,7 +145,6 @@ class TextToolbar(QWidget):
                 background: none;
             }}
             """)
-        # Common font sizes
         font_sizes = [
             '8', '9', '10', '11', '12', '14', '16', '18', '20',
             '22', '24', '26', '28', '36', '48', '72'
@@ -158,7 +155,6 @@ class TextToolbar(QWidget):
         self.fontSizeComboBox.lineEdit().editingFinished.connect(self.changeFontSize)
         h_layout.addWidget(self.fontSizeComboBox)
 
-        # Font selector
         self.fontSelector = QComboBox()
         self.fontSelector.setFixedHeight(40)
         self.fontSelector.setFont(QFont(inter_font_family))
@@ -219,6 +215,12 @@ class TextToolbar(QWidget):
 
 
         self.setLayout(h_layout)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        position = self.pos()
+        print(f'TextToolbar position: {position}')
+
     def focusOutEvent(self, event):
         # Do not deselect the item when it loses focus
         self.setTextInteractionFlags(Qt.NoTextInteraction)

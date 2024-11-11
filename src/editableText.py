@@ -9,16 +9,16 @@ class ItemData(QObject):
     dataChanged = pyqtSignal()
 
 class EditableTextItem(QGraphicsTextItem):
-    def __init__(self, text="Text", toolbar=None):
+    def __init__(self, text="Text"):
         super().__init__(text)
-        self.toolbar = toolbar  # Set the toolbar passed as a parameter
         self.setFlags(QGraphicsItem.ItemIsSelectable | QGraphicsItem.ItemIsMovable | QGraphicsItem.ItemIsFocusable)
         self.itemData = ItemData()
         self.setDefaultTextColor(Qt.white)
         
         self.handles = [HandleItem(self) for _ in range(4)]
         self.hideHandles()
-        #self.setSelected(True)
+
+        self.toolbar = TextToolbar()
 
     def mouseMoveEvent(self, event):
         super().mouseMoveEvent(event)
@@ -27,7 +27,7 @@ class EditableTextItem(QGraphicsTextItem):
             pos = view.mapFromScene(self.sceneBoundingRect().topRight())
             global_pos = view.viewport().mapToGlobal(pos)
             self.toolbar.move(global_pos.x(), global_pos.y() - self.toolbar.height())
-
+            
     def mouseDoubleClickEvent(self, event):
         self.setTextInteractionFlags(Qt.TextEditorInteraction)
         self.setFocus()
@@ -36,6 +36,15 @@ class EditableTextItem(QGraphicsTextItem):
         self.itemData.dataChanged.emit()
 
         super().mouseDoubleClickEvent(event)
+
+    def focusOutEvent(self, event):
+
+        # Do not deselect the item when it loses focus
+        self.setTextInteractionFlags(Qt.NoTextInteraction)
+        self.clearFocus()
+        # Remove or comment out the line below
+        # self.setSelected(False)
+        super().focusOutEvent(event)
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_B and event.modifiers() == Qt.ControlModifier:
@@ -147,41 +156,30 @@ class EditableTextItem(QGraphicsTextItem):
         originalRect = super().boundingRect()
         outlineWidth = 3
         return originalRect.adjusted(-outlineWidth, -outlineWidth, outlineWidth, outlineWidth)
-    
-    def focusOutEvent(self, event):
-        # Do not deselect the item when it loses focus
-        self.setTextInteractionFlags(Qt.NoTextInteraction)
-        self.clearFocus()
-        # Remove or comment out the line below
-        # self.setSelected(False)
-        super().focusOutEvent(event)
 
     def itemChange(self, change, value):
         if change == QGraphicsItem.ItemSelectedHasChanged:
             if value:
-                # Item has been selected
+                self.showHandles()
                 # Show toolbar
                 if self.toolbar:
                     self.toolbar.setEditableTextItem(self)
                     # Position the toolbar near the text item
-                    if self.scene() and self.scene().views():
-                        view = self.scene().views()[0]  # Assuming one view
-                        pos = view.mapFromScene(self.sceneBoundingRect().topRight())
-                        global_pos = view.viewport().mapToGlobal(pos)
-                        self.toolbar.move(global_pos.x(), global_pos.y() - self.toolbar.height())
-                        self.toolbar.show()
+                    view = self.scene().views()[0]  # Assuming one view
+                    pos = view.mapFromScene(self.sceneBoundingRect().topRight())
+                    global_pos = view.viewport().mapToGlobal(pos)
+                    self.toolbar.move(global_pos.x(), global_pos.y() - self.toolbar.height())
+                    self.toolbar.show()
             else:
-                # Item has been deselected
+                self.hideHandles()
                 # Hide toolbar
                 if self.toolbar:
                     self.toolbar.hide()
                     self.toolbar.setEditableTextItem(None)
-
                 # Clear text selection
                 cursor = self.textCursor()
                 cursor.clearSelection()
                 self.setTextCursor(cursor)
-
                 # Optionally remove focus
                 self.clearFocus()
 
@@ -211,7 +209,7 @@ class EditableTextItem(QGraphicsTextItem):
 
         for handle, pos in zip(self.handles, corners):
             handle.setPos(self.mapToScene(pos))
-            handle.show()
+           # handle.show()
 
     def hideHandles(self):
         for handle in self.handles:
@@ -219,5 +217,5 @@ class EditableTextItem(QGraphicsTextItem):
 
     def showHandles(self):
         self.updateHandles()
-        for handle in self.handles:
-            handle.show()
+       # for handle in self.handles:
+        #    handle.show()
