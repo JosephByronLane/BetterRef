@@ -6,6 +6,7 @@ from selectable_item import SelectableImageItem
 from PyQt5.QtWidgets import QAction
 import json
 from PyQt5.QtWidgets import QFileDialog
+from text.text_toolbar import TextToolbar
 from video_player import VideoGraphicsItem
 from PyQt5.QtMultimediaWidgets import QVideoWidget
 from PyQt5.QtWidgets import QGraphicsTextItem, QGraphicsItem, QGraphicsProxyWidget
@@ -36,7 +37,7 @@ class InfiniteCanvas(QGraphicsView):
 
         self.setSceneRect(-100000000, -100000000, 200000000, 200000000)
 
-        self.setBackgroundBrush(QColor("#202020"))
+        self.setBackgroundBrush(QColor("#181818"))
 
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -65,6 +66,10 @@ class InfiniteCanvas(QGraphicsView):
 
         self.addImageDisplayWidget()
 
+    def hideImageDisplayWidget(self):
+        if self.proxy_widget and self.proxy_widget.isVisible():
+            self.proxy_widget.hide()
+
     def addImageDisplayWidget(self):
         self.image_display_widget = ImageDisplayWidget(canvas_instance=self)
 
@@ -74,32 +79,26 @@ class InfiniteCanvas(QGraphicsView):
         container_layout.setContentsMargins(10, 10, 10, 10)  
 
         container_widget.setObjectName("imageDisplayContainer")
-
         container_widget.setStyleSheet("""
             QWidget#imageDisplayContainer {
                 background: transparent;
-                border: 2px dotted #5F5F5F;  /* Dotted border with blue color */
-                border-radius:10px;
+                border: 2px dotted #5F5F5F;
+                border-radius: 10px;
             }
         """)
 
-        proxy_widget = QGraphicsProxyWidget()
-        proxy_widget.setWidget(container_widget)
+        self.proxy_widget = QGraphicsProxyWidget()
+        self.proxy_widget.setWidget(container_widget)
 
-        self.scene.addItem(proxy_widget)
+        self.scene.addItem(self.proxy_widget)
 
         scene_width = self.scene.width()
         scene_height = self.scene.height()
-
         widget_width = container_widget.width()
         widget_height = container_widget.height()
-
         center_x = (scene_width - widget_width) / 2
         center_y = (scene_height - widget_height) / 2
-
-        proxy_widget.setPos(center_x, center_y)
-
-
+        self.proxy_widget.setPos(center_x, center_y)
 
     def selectAllItems(self):
         for item in self.scene.items():
@@ -237,8 +236,13 @@ class InfiniteCanvas(QGraphicsView):
             super().keyPressEvent(event)
     
     def addTextItem(self):
+        self.hideImageDisplayWidget()
+
         mouse_pos = self.mapToScene(self.mapFromGlobal(QCursor.pos()))  
-        text_item = EditableTextItem("Text")
+
+        toolbar = TextToolbar()
+
+        text_item = EditableTextItem("Sample Text", toolbar=toolbar)
         text_item.setDefaultTextColor(Qt.white) 
 
         font = text_item.font()
@@ -248,6 +252,8 @@ class InfiniteCanvas(QGraphicsView):
         text_item.setFlags(QGraphicsItem.ItemIsMovable | QGraphicsItem.ItemIsSelectable) 
         text_item.setPos(mouse_pos)
         self.scene.addItem(text_item)
+        text_item.setSelected(True)
+
         text_item.setTextInteractionFlags(Qt.TextEditorInteraction)
         text_item.setFocus()
         text_item.setTextInteractionFlags(Qt.NoTextInteraction)       
@@ -278,6 +284,8 @@ class InfiniteCanvas(QGraphicsView):
                 QMessageBox.critical(self, "Error", "Unsupported file format. Please drop a supported file (mp4, avi, mov, png, jpg, webp).")
                 
     def addVideoToScene(self, file_path, position):
+        self.hideImageDisplayWidget()
+
         print("adding video")
         videoItem = VideoGraphicsItem(file_path)
         videoItem.setData(0, file_path)  
@@ -290,6 +298,8 @@ class InfiniteCanvas(QGraphicsView):
         print("video added")
 
     def addImageToScene(self, image_path, position):
+        self.hideImageDisplayWidget()
+
         pixmap = QPixmap(image_path)
         if not pixmap.isNull():
             item = SelectableImageItem(pixmap)

@@ -3,21 +3,22 @@ from PyQt5.QtGui import QFont, QColor, QPen, QTextCursor, QTextCharFormat
 from PyQt5.QtCore import pyqtSignal, QObject, Qt
 from handle_item import HandleItem
 from text.text_toolbar import TextToolbar
+from PyQt5.QtWidgets import QStyleOptionGraphicsItem, QStyle
 
 class ItemData(QObject):
     dataChanged = pyqtSignal()
 
 class EditableTextItem(QGraphicsTextItem):
-    def __init__(self, text="Text"):
+    def __init__(self, text="Text", toolbar=None):
         super().__init__(text)
+        self.toolbar = toolbar  # Set the toolbar passed as a parameter
         self.setFlags(QGraphicsItem.ItemIsSelectable | QGraphicsItem.ItemIsMovable | QGraphicsItem.ItemIsFocusable)
         self.itemData = ItemData()
         self.setDefaultTextColor(Qt.white)
         
         self.handles = [HandleItem(self) for _ in range(4)]
         self.hideHandles()
-
-        self.toolbar = TextToolbar()
+        #self.setSelected(True)
 
     def mouseMoveEvent(self, event):
         super().mouseMoveEvent(event)
@@ -26,27 +27,6 @@ class EditableTextItem(QGraphicsTextItem):
             pos = view.mapFromScene(self.sceneBoundingRect().topRight())
             global_pos = view.viewport().mapToGlobal(pos)
             self.toolbar.move(global_pos.x(), global_pos.y() - self.toolbar.height())
-            
-    def itemChange(self, change, value):
-        if change == QGraphicsItem.ItemSelectedHasChanged:
-            if value:
-                self.showHandles()
-                # Show toolbar
-                if self.toolbar:
-                    self.toolbar.setEditableTextItem(self)
-                    # Position the toolbar near the text item
-                    view = self.scene().views()[0]  # Assuming one view
-                    pos = view.mapFromScene(self.sceneBoundingRect().topRight())
-                    global_pos = view.viewport().mapToGlobal(pos)
-                    self.toolbar.move(global_pos.x(), global_pos.y() - self.toolbar.height())
-                    self.toolbar.show()
-            else:
-                self.hideHandles()
-                # Hide toolbar
-                if self.toolbar:
-                    self.toolbar.hide()
-                    self.toolbar.setEditableTextItem(None)
-        return super().itemChange(change, value)
 
     def mouseDoubleClickEvent(self, event):
         self.setTextInteractionFlags(Qt.TextEditorInteraction)
@@ -107,15 +87,12 @@ class EditableTextItem(QGraphicsTextItem):
 
     def setFontSize(self, size):
         cursor = self.textCursor()
-        format = QTextCharFormat()
-        format.setFontPointSize(size)
-        
-        if cursor.hasSelection():
-            cursor.setCharFormat(format)
-        else:
+        if not cursor.hasSelection():
             cursor.select(QTextCursor.Document)
-            cursor.mergeCharFormat(format)
-            self.setTextCursor(cursor)
+        format = cursor.charFormat()
+        format.setFontPointSize(size)
+        cursor.mergeCharFormat(format)
+        self.setTextCursor(cursor)
 
     def changeFont(self):
         font, ok = QFontDialog.getFont(self.font())
@@ -124,15 +101,12 @@ class EditableTextItem(QGraphicsTextItem):
 
     def setFont(self, font):
         cursor = self.textCursor()
-        format = QTextCharFormat()
-        format.setFont(font)
-
-        if cursor.hasSelection():
-            cursor.setCharFormat(format)
-        else:
+        if not cursor.hasSelection():
             cursor.select(QTextCursor.Document)
-            cursor.mergeCharFormat(format)
-            self.setTextCursor(cursor)
+        format = cursor.charFormat()
+        format.setFontFamily(font.family())
+        cursor.mergeCharFormat(format)
+        self.setTextCursor(cursor)
 
     def setTextColor(self, color):
         cursor = self.textCursor()
@@ -146,20 +120,21 @@ class EditableTextItem(QGraphicsTextItem):
     def toggleBold(self):
         cursor = self.textCursor()
         if not cursor.hasSelection():
-            return
-
+            cursor.select(QTextCursor.Document)
         format = cursor.charFormat()
-        format.setFontWeight(QFont.Bold if format.fontWeight() != QFont.Bold else QFont.Normal)
-        cursor.setCharFormat(format)
+        weight = format.fontWeight()
+        format.setFontWeight(QFont.Bold if weight != QFont.Bold else QFont.Normal)
+        cursor.mergeCharFormat(format)
+        self.setTextCursor(cursor)
 
     def toggleItalic(self):
         cursor = self.textCursor()
         if not cursor.hasSelection():
-            return
-
+            cursor.select(QTextCursor.Document)
         format = cursor.charFormat()
         format.setFontItalic(not format.fontItalic())
-        cursor.setCharFormat(format)
+        cursor.mergeCharFormat(format)
+        self.setTextCursor(cursor)
 
     def focusOutEvent(self, event):
         self.setTextInteractionFlags(Qt.NoTextInteraction)
@@ -172,30 +147,55 @@ class EditableTextItem(QGraphicsTextItem):
         originalRect = super().boundingRect()
         outlineWidth = 3
         return originalRect.adjusted(-outlineWidth, -outlineWidth, outlineWidth, outlineWidth)
+    
+    def focusOutEvent(self, event):
+        # Do not deselect the item when it loses focus
+        self.setTextInteractionFlags(Qt.NoTextInteraction)
+        self.clearFocus()
+        # Remove or comment out the line below
+        # self.setSelected(False)
+        super().focusOutEvent(event)
 
     def itemChange(self, change, value):
         if change == QGraphicsItem.ItemSelectedHasChanged:
             if value:
-                self.showHandles()
+                # Item has been selected
                 # Show toolbar
                 if self.toolbar:
                     self.toolbar.setEditableTextItem(self)
                     # Position the toolbar near the text item
-                    view = self.scene().views()[0]  # Assuming one view
-                    pos = view.mapFromScene(self.sceneBoundingRect().topRight())
-                    global_pos = view.viewport().mapToGlobal(pos)
-                    self.toolbar.move(global_pos.x(), global_pos.y() - self.toolbar.height())
-                    self.toolbar.show()
+                    if self.scene() and self.scene().views():
+                        view = self.scene().views()[0]  # Assuming one view
+                        pos = view.mapFromScene(self.sceneBoundingRect().topRight())
+                        global_pos = view.viewport().mapToGlobal(pos)
+                        self.toolbar.move(global_pos.x(), global_pos.y() - self.toolbar.height())
+                        self.toolbar.show()
             else:
-                self.hideHandles()
+                # Item has been deselected
                 # Hide toolbar
                 if self.toolbar:
                     self.toolbar.hide()
                     self.toolbar.setEditableTextItem(None)
+
+                # Clear text selection
+                cursor = self.textCursor()
+                cursor.clearSelection()
+                self.setTextCursor(cursor)
+
+                # Optionally remove focus
+                self.clearFocus()
+
         return super().itemChange(change, value)
 
     def paint(self, painter, option, widget=None):
+        # Create a copy of the option and remove the State_HasFocus flag
+        option = QStyleOptionGraphicsItem(option)  # Make a copy to avoid modifying the original
+        option.state &= ~QStyle.State_HasFocus     # Remove the focus state
+
+        # Call the superclass paint method with the modified option
         super().paint(painter, option, widget)
+
+        # Custom selection rectangle (if needed)
         if self.isSelected():
             painter.setPen(QPen(QColor('blue'), 3))
             painter.drawRect(self.boundingRect().adjusted(3, 3, -3, -3))
