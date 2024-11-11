@@ -280,19 +280,20 @@ class InfiniteCanvas(QGraphicsView):
     def dragMoveEvent(self, event: QDragEnterEvent):
         if event.mimeData().hasUrls():
             event.acceptProposedAction()
-            
+
     def dropEvent(self, event: QDropEvent):
         if event.mimeData().hasUrls():
-            url = event.mimeData().urls()[0]
-            file_path = url.toLocalFile()
+            urls = event.mimeData().urls()  # Obtener todas las URLs de los archivos
+            for url in urls:
+                file_path = url.toLocalFile()
 
-            if file_path.lower().endswith(('.mp4', '.avi', '.mov')):  
-                self.addVideoToScene(file_path, event.pos())
-            elif file_path.lower().endswith(('.png', '.jpg', '.webp')):  
-                self.addImageToScene(file_path, event.pos()) 
-            else:
-                QMessageBox.critical(self, "Error", "Unsupported file format. Please drop a supported file (mp4, avi, mov, png, jpg, webp).")
-                
+                if file_path.lower().endswith(('.mp4', '.avi', '.mov')):  
+                    self.addVideoToScene(file_path, event.pos())
+                elif file_path.lower().endswith(('.png', '.jpg', '.webp')):  
+                    self.addImageToScene(file_path, event.pos())  # Agregar imagen a la escena
+                else:
+                    QMessageBox.critical(self, "Error", "Unsupported file format. Please drop a supported file (mp4, avi, mov, png, jpg, webp).")
+
     def addVideoToScene(self, file_path, position):
         self.hideImageDisplayWidget()
 
